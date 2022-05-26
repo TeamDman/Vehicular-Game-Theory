@@ -1,0 +1,173 @@
+<body>
+    <div style="display:flex;">
+        <div style="margin-right:10px;">
+            <table border="1">
+                <thead>
+                    <tr></tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <div style="font-size:larger">
+                Total attack cost: <span id="attackcost"></span>
+                Total attack risk: <span id="attackrisk"></span>
+                <br>
+                Total defend cost: <span id="defendcost"></span>
+                Total defend risk: <span id="defendrisk"></span>
+            </div>
+            <div>
+                <button type="button" id="loadnaive">Load naive</button>
+                <button type="button" id="loadbest">Load best</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const data = await (await fetch("./game.json")).json();
+        const naiveAttacker = await (await fetch("./naiveattacker.json")).json();
+        const naiveDefender = await (await fetch("./naivedefender.json")).json();
+        const bestAttacker = await (await fetch("./bestattacker.json")).json();
+        const bestDefender = await (await fetch("./bestdefender.json")).json();
+        function getRisk(action) {
+            return action.severity ** 2 * action.probabilityAttack * (1-action.probabilityDefend) * (action.costDefend / action.costAttack);
+        }
+        for (const entry of data) {
+            entry.attacking = false;
+            entry.defending = false;
+            entry.risk = getRisk(entry);
+        }
+
+        function rebuildTable() {
+            const [componentCount, vulnCount] = data
+                .map(x => x.attack.match("(\\d+),(\\d+)").slice(1))
+                .reduce((a,b) => {
+                    a[0]=Math.max(a[0], parseInt(b[0]));
+                    a[1]=Math.max(a[1], parseInt(b[1]));
+                    return a;
+                }, [0,0]);
+            const table = document.querySelector("table");
+            const tableHead = table.querySelector("thead tr");
+            const tableBody = table.querySelector("tbody");
+            tableHead.innerHTML = "";
+            tableBody.innerHTML = "";
+
+            tableHead.appendChild(document.createElement("th"));
+            for (var i = 1; i <= vulnCount; i++) {
+                const elem = document.createElement("th");
+                elem.innerText = "Vuln " + i;
+                tableHead.appendChild(elem);
+            }
+
+            for (var i = 1; i <= componentCount; i++) {
+                const elem = document.createElement("tr");
+                const label = document.createElement("td");
+                label.innerText = "Comp " + i;
+                elem.appendChild(label);
+                for (var j = 1; j <= vulnCount; j++) {
+                    const entry = data.filter(x => x.attack === `attack(${i},${j})`)?.[0];
+                    const value = document.createElement("td");
+                    value.classList.add("noselect");
+                    if (entry === undefined) {
+                        value.classList.add("invalid");
+                    } else {
+                        const temp = { ...entry };
+                        delete temp.attack;
+                        delete temp.attacking;
+                        delete temp.defending;
+                        value.innerText = JSON.stringify(temp, null, 2);
+                        value.addEventListener("click", e => {
+                            value.classList.toggle("attack");
+                            entry.attacking ^= 1;
+                            rebuildLabels();
+                        });
+
+                        value.addEventListener("contextmenu", e => {
+                            value.classList.toggle("defend");
+                            entry.defending ^= 1;
+                            rebuildLabels();
+                            e.preventDefault();
+                        });
+
+                        if (entry.attacking) value.classList.add("attack");
+                        if (entry.defending) value.classList.add("defend");
+                    }
+                    elem.appendChild(value);
+                }
+                tableBody.appendChild(elem);
+            }
+        }
+
+        function rebuildLabels() {
+            const attackCost = document.querySelector("#attackcost");
+            const defendCost = document.querySelector("#defendcost");
+            attackCost.innerText = data.filter(x => x.attacking).reduce((a, b) => a += b.costAttack, 0);
+            defendCost.innerText = data.filter(x => x.defending).reduce((a, b) => a += b.costDefend, 0);
+            const attackRisk = document.querySelector("#attackrisk");
+            const defendRisk = document.querySelector("#defendrisk");
+            attackRisk.innerText = data.filter(x => x.attacking).reduce((a, b) => a += b.risk, 0);
+            defendRisk.innerText = data.filter(x => x.defending).reduce((a, b) => a += b.risk, 0);
+        }
+
+        function assignActions(attacking, defending) {
+            for (const entry of data) {
+                entry.attacking = attacking.some(x=>x.attack === entry.attack);
+                entry.defending = defending.some(x=>x.attack === entry.attack);
+            }
+        }
+
+        document.querySelector("#loadnaive").addEventListener("click", e=>{
+            assignActions(naiveAttacker, naiveDefender);
+            rebuildTable();
+            rebuildLabels();
+        });
+        document.querySelector("#loadbest").addEventListener("click", e=>{
+            assignActions(bestAttacker, bestDefender);
+            rebuildTable();
+            rebuildLabels();
+        });
+
+        rebuildTable(5, 4);
+        rebuildLabels();
+        window.myData = data;
+    </script>
+    <style>
+        th,
+        td {
+            padding: 5px;
+        }
+
+        .invalid {
+            background-color: gray;
+        }
+
+        .attack {
+            background-color: lightcoral;
+        }
+
+        .defend {
+            background-color: #2c50c4;
+        }
+
+        .attack.defend {
+            background: linear-gradient(to right bottom, lightcoral 50%, #2c50c4 50%);
+        }
+
+        .noselect {
+            -webkit-touch-callout: none;
+            /* iOS Safari */
+            -webkit-user-select: none;
+            /* Safari */
+            -khtml-user-select: none;
+            /* Konqueror HTML */
+            -moz-user-select: none;
+            /* Old versions of Firefox */
+            -ms-user-select: none;
+            /* Internet Explorer/Edge */
+            user-select: none;
+            /* Non-prefixed version, currently
+                                            supported by Chrome, Edge, Opera and Firefox */
+        }
+    </style>
+</body>

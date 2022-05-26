@@ -1,0 +1,26 @@
+[
+  {
+    "attack":"attack(1,4)",
+    "costAttack":3,
+    "costDefend":8,
+    "probabilityAttack":0.6378843476992114,
+    "probabilityDefend":0.5205060626982062,
+    "severity":3
+  },
+  {
+    "attack":"attack(5,3)",
+    "costAttack":4,
+    "costDefend":7,
+    "probabilityAttack":0.7069831040347149,
+    "probabilityDefend":0.8506219852780157,
+    "severity":4
+  },
+  {
+    "attack":"attack(5,4)",
+    "costAttack":1,
+    "costDefend":4,
+    "probabilityAttack":0.7411423001002098,
+    "probabilityDefend":0.6206587221736445,
+    "severity":2
+  }
+]
