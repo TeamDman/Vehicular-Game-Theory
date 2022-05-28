@@ -29,13 +29,22 @@
                 <br>
                 Total value: <span id="total"></span>
             </div>
+            <div>
+                attacker: <select id="pickatk"></select>
+                capacity: <input id="atkcap" type="number" value=10>
+                <br>
+                defender: <select id="pickdef"></select>
+                capacity: <input id="defcap" type="number" value="10">
+                <br>
+                <button id="newboard" type="button">New board</button>
+            </div>
         </div>
     </div>
 
     <script type="module">
         import { generateBoard } from "./modules/board.mjs";
-        import { strategies, evaluateStrategies } from "./modules/solver.mjs";
-        import { renderBoard } from "./modules/renderer.mjs"
+        import { strategies, evaluateStrategies, evalFor } from "./modules/solver.mjs";
+        import { renderAll, renderBoard } from "./modules/renderer.mjs"
 
         const state = {
             board: generateBoard(),
@@ -46,6 +55,18 @@
 
         console.log(evaluateStrategies());
 
-        renderBoard(state);
+
+        document.querySelector("#newboard").addEventListener("click", e=>{
+            const atkStrat = document.querySelector("#pickatk").value;
+            const atkCap = document.querySelector("#atkcap").value;
+            const defStrat = document.querySelector("#pickdef").value;
+            const defCap = document.querySelector("#atkcap").value;
+            state.board = generateBoard();
+            state.attacking = evalFor(strategies[atkStrat], "attacker", state.board, atkCap);
+            state.defending = evalFor(strategies[defStrat], "defender", state.board, defCap);
+            renderBoard(state);
+        });
+        
+        renderAll(state);
     </script>
 </body>

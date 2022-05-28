@@ -1,4 +1,4 @@
-import { valueFunc } from "./solver.mjs";
+import { valueFunc, strategies } from "./solver.mjs";
 
 function toggleMembership(set, action) {
     if (set.has(action.key)) set.delete(action.key);
@@ -76,6 +76,23 @@ export function renderBoard(state) {
     rebuildBoardLabels(state);
 }
 
+export function renderPickers() {
+    const atk = document.querySelector("#pickatk");
+    const def = document.querySelector("#pickdef");
+    for(const v of Object.keys(strategies)) {
+        const elem = document.createElement("option");
+        elem.innerText = v;
+        atk.appendChild(elem);
+        def.appendChild(elem.cloneNode(true));
+    }
+}
+
 export function rebuildComparisonTable() {
 
+}
+
+
+export function renderAll(state) {
+    renderBoard(state);
+    renderPickers();
 }

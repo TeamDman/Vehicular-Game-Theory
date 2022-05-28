@@ -1,13 +1,4 @@
-// inclusive rand
-function randI(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-// inclusive rand int
-function rand(min, max) {
-    const rtn = Math.random() * (max - min) + min;
-    return Math.round(rtn*100)/100;
-}
+import { rand, randI } from "./utils.mjs";
 
 export function getRisk(action) {
     const rtn = action.severity ** 2 * action.probAttack * (1-action.probDefend) * (action.costDefend / action.costAttack);
