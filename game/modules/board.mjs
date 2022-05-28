@@ -14,17 +14,6 @@ export function getRisk(action) {
     return Math.round(rtn*100)/100;
 }
 
-export function valueFunc(board) {
-    const rtn = board
-        .filter(x => x.attacking)
-        .reduce((acc, v) => {
-            let inc = (v.severity ** 2) * v.probAttack;
-            if (v.defending) inc *= 1-v.probDefend;
-            return acc + inc;
-        }, 0);
-    return Math.round(rtn*100)/100;
-}
-
 export function generateBoard(
     options = {
         numComponents: 5,
@@ -36,6 +25,7 @@ export function generateBoard(
     for (let i=0; i<options.numComponents; i++) {
         for (let j=0; j<options.numVulnerabilities-options.weaknesses[i]; j++) {
             const entry = {
+                key: `${i},${j}`,
                 comp: i,
                 vuln: j,
                 costAttack: randI(1, 10),
@@ -43,8 +33,6 @@ export function generateBoard(
                 probAttack: rand(0.5, 0.98),
                 probDefend: rand(0.5, 0.98),
                 severity: randI(1,5),
-                attacking: false,
-                defending: false,
             };
             entry.risk = getRisk(entry);
             rtn.push(entry);

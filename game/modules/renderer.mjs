@@ -1,10 +1,14 @@
-import { valueFunc } from "./board.mjs";
+import { valueFunc } from "./solver.mjs";
 
-export function rebuildTable(board) {
-    const componentCount = board.map(x=>x.comp).reduce((a,v)=>Math.max(a,v+1),0);
-    const vulnCount = board.map(x=>x.vuln).reduce((a,v)=>Math.max(a,v+1),0);
-    console.log(componentCount, vulnCount);
-    const table = document.querySelector("table");
+function toggleMembership(set, action) {
+    if (set.has(action.key)) set.delete(action.key);
+    else set.add(action.key);
+}
+
+export function rebuildBoardTable(state) {
+    const componentCount = state.board.map(x=>x.comp).reduce((a,v)=>Math.max(a,v+1),0);
+    const vulnCount = state.board.map(x=>x.vuln).reduce((a,v)=>Math.max(a,v+1),0);
+    const table = document.querySelector("#board");
     const tableHead = table.querySelector("thead tr");
     const tableBody = table.querySelector("tbody");
     tableHead.innerHTML = "";
@@ -23,7 +27,7 @@ export function rebuildTable(board) {
         label.innerText = "Comp " + i;
         elem.appendChild(label);
         for (var j = 0; j < vulnCount; j++) {
-            const entry = board.filter(x => `${x.comp},${x.vuln}` === `${i},${j}`)?.[0];
+            const entry = state.board.filter(x => `${x.comp},${x.vuln}` === `${i},${j}`)?.[0];
             const value = document.createElement("td");
             value.classList.add("noselect");
             if (entry === undefined) {
@@ -38,19 +42,19 @@ export function rebuildTable(board) {
                 value.innerText = desc.trimEnd();
                 value.addEventListener("click", e => {
                     value.classList.toggle("attack");
-                    entry.attacking = !entry.attacking;
-                    rebuildLabels(board);
+                    toggleMembership(state.attacking, entry);
+                    rebuildBoardLabels(state);
                 });
 
                 value.addEventListener("contextmenu", e => {
                     value.classList.toggle("defend");
-                    entry.defending = !entry.defending;
-                    rebuildLabels(board);
+                    toggleMembership(state.defending, entry);
+                    rebuildBoardLabels(state);
                     e.preventDefault();
                 });
 
-                if (entry.attacking) value.classList.add("attack");
-                if (entry.defending) value.classList.add("defend");
+                if (state.attacking.has(entry.key)) value.classList.add("attack");
+                if (state.defending.has(entry.key)) value.classList.add("defend");
             }
             elem.appendChild(value);
         }
@@ -58,16 +62,20 @@ export function rebuildTable(board) {
     }
 }
 
-export function rebuildLabels(board) {
+export function rebuildBoardLabels(state) {
     const attackCost = document.querySelector("#attackcost");
     const defendCost = document.querySelector("#defendcost");
-    attackCost.innerText = board.filter(x => x.attacking).reduce((a, b) => a += b.costAttack, 0);
-    defendCost.innerText = board.filter(x => x.defending).reduce((a, b) => a += b.costDefend, 0);
+    attackCost.innerText = state.board.filter(x => state.attacking.has(x.key)).reduce((a, b) => a += b.costAttack, 0);
+    defendCost.innerText = state.board.filter(x => state.defending.has(x.key)).reduce((a, b) => a += b.costDefend, 0);
     const total = document.querySelector("#total");
-    total.innerText = valueFunc(board);
+    total.innerText = valueFunc(state);
 }
 
-export function render(board) {
-    rebuildTable(board);
-    rebuildLabels(board);
+export function renderBoard(state) {
+    rebuildBoardTable(state);
+    rebuildBoardLabels(state);
+}
+
+export function rebuildComparisonTable() {
+
 }

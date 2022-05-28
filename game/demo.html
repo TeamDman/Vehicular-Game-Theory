@@ -4,7 +4,16 @@
 <body>
     <div style="display:flex;">
         <div style="margin-right:10px;">
-            <table border="1">
+            <table id="comparison" border="1">
+                <thead>
+                    <tr></tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-right:10px;">
+            <table id="board" border="1">
                 <thead>
                     <tr></tr>
                 </thead>
@@ -20,40 +29,23 @@
                 <br>
                 Total value: <span id="total"></span>
             </div>
-            <div>
-                <button type="button" id="loadnaive">Load naive</button>
-                <button type="button" id="loadbest">Load best</button>
-            </div>
         </div>
     </div>
 
     <script type="module">
         import { generateBoard } from "./modules/board.mjs";
-        import { strategies } from "./modules/solver.mjs";
-        import { render } from "./modules/renderer.mjs"
+        import { strategies, evaluateStrategies } from "./modules/solver.mjs";
+        import { renderBoard } from "./modules/renderer.mjs"
 
-        const board = generateBoard();
-        window.board = board;
+        const state = {
+            board: generateBoard(),
+            attacking: new Set(),
+            defending: new Set(),
+        };
+        window.state = state;
 
-        function assignActions(attacking, defending) {
-            for (const entry of data) {
-                entry.attacking = attacking.some(x=>x.attack === entry.attack);
-                entry.defending = defending.some(x=>x.attack === entry.attack);
-            }
-        }
+        console.log(evaluateStrategies());
 
-        document.querySelector("#loadnaive").addEventListener("click", e=>{
-            assignActions(naiveAttacker, naiveDefender);
-            rebuildTable();
-            rebuildLabels();
-        });
-        document.querySelector("#loadbest").addEventListener("click", e=>{
-            assignActions(bestAttacker, bestDefender);
-            rebuildTable();
-            rebuildLabels();
-        });
-
-        render(board);
-        console.log(board);
+        renderBoard(state);
     </script>
 </body>
