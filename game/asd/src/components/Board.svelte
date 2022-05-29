@@ -60,6 +60,11 @@
 </table>
 
 <style>
+	:root {
+		--atk: rgba(240, 128, 128, 0.712);
+		--def: #2c4fc4a9;
+	}
+
 	th,
 	td {
 		padding: 5px;
@@ -79,15 +84,15 @@
 	}
 
 	.attacking:not(.defending) {
-		background-color: rgba(240, 128, 128, 0.712) 50%;
+		background-color: var(--atk);
 	}
 
 	.defending:not(.attacking) {
-		background-color: #2c50c4;
+		background-color: var(--def);
 	}
 
 	.attacking.defending {
-		background: linear-gradient(to left bottom, rgba(240, 128, 128, 0.712) 50%, #2c4fc4a9 50%);
+		background: linear-gradient(to left bottom, var(--atk) 50%, var(--def) 50%);
 	}
 
 	.noselect {
