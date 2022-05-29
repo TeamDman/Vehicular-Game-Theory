@@ -30,3 +30,10 @@ export type State = {
 	attacking: Set<string>;
 	defending: Set<string>;
 }
+
+export type Strategy = (
+	board: Board,
+	costFunc: (v: Action) => number,
+	probFunc: (v: Action) => number,
+	capacity: any
+) => Set<string>

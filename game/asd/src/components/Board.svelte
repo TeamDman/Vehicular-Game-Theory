@@ -5,15 +5,15 @@
 	export let state: State;
 	const dispatch = createEventDispatcher();
 
-	const componentCount = state.board.map((x) => x.comp).reduce((a, v) => Math.max(a, v + 1), 0);
-	const vulnCount = state.board.map((x) => x.vuln).reduce((a, v) => Math.max(a, v + 1), 0);
+	$: componentCount = state.board.map((x) => x.comp).reduce((a, v) => Math.max(a, v + 1), 0);
+	$: vulnCount = state.board.map((x) => x.vuln).reduce((a, v) => Math.max(a, v + 1), 0);
 
-	function getAction(i: number, j: number) {
+	function getAction(state: State, i: number, j: number) {
 		return state.board.find((x) => x.comp === i && x.vuln === j) ?? null;
 	}
 	function getDesc(action?: Action) {
 		if (action === null) return '';
-		const keys = ['attackCost', 'defendCost', 'attackProb', 'defendProb'];
+		const keys: (keyof Action)[] = ['attackCost', 'defendCost', 'attackProb', 'defendProb', 'risk', 'severity'];
 		let desc = '';
 		for (const key of keys) {
 			desc += `${key}: ${(action as any)[key]}\n`;
@@ -25,7 +25,7 @@
 	}
 </script>
 
-<table border="1">
+<table>
 	<thead>
 		<tr>
 			<th />
@@ -39,7 +39,7 @@
 			<tr>
 				<td>Comp {i}</td>
 				{#each Array(vulnCount) as _, j}
-					{@const action = getAction(i, j)}
+					{@const action = getAction(state, i, j)}
 					{#if action}
 						<td
 							on:click={() => toggle(action, 'attacker')}
@@ -64,22 +64,30 @@
 	td {
 		padding: 5px;
 		white-space: pre-line;
+		border: 2px solid;
+		border-top-color: black;
+		border-left-color: black;
+		border-right-color: #777;
+		border-bottom-color: #777;
+	}
+	table {
+		border: 1px solid black;
 	}
 
 	.inactive {
 		background-color: gray;
 	}
 
-	.attacking {
-		background-color: lightcoral;
+	.attacking:not(.defending) {
+		background-color: rgba(240, 128, 128, 0.712) 50%;
 	}
 
-	.defending {
+	.defending:not(.attacking) {
 		background-color: #2c50c4;
 	}
 
 	.attacking.defending {
-		background: linear-gradient(to right bottom, lightcoral 50%, #2c50c4 50%);
+		background: linear-gradient(to left bottom, rgba(240, 128, 128, 0.712) 50%, #2c4fc4a9 50%);
 	}
 
 	.noselect {

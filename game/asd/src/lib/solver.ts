@@ -1,54 +1,53 @@
 import { knapsack } from "./knapsack";
 import { generateBoard } from "./board";
 import { toFixed } from "./utils";
+import type { Action, Board, Player, State, Strategy } from "src/app";
 
-export function valueFunc(state) {
+export function valueFunc(state: State) {
     const rtn = state.board
         .filter(v => state.attacking.has(v.key))
         .reduce((acc, v) => {
-            let inc = (v.severity ** 2) * v.probAttack;
-            if (state.defending.has(v.key)) inc *= 1-v.probDefend;
+            let inc = (v.severity ** 2) * v.attackProb;
+            if (state.defending.has(v.key)) inc *= 1-v.defendProb;
             return acc + inc;
         }, 0);
     return Math.round(rtn*100)/100;
 }
 
-export function best(
+export const best: Strategy = (
     board,
     costFunc,
     probFunc,
     capacity
-) {
-    const rtn = knapsack(board, costFunc, x => x.severity, capacity);
-    return rtn.subset.reduce((acc, v) => acc.add(v.key), new Set());
+) => {
+    const rtn = knapsack(board, costFunc, (x: Action) => x.severity, capacity).subset;
+    return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
-export function worst(
+export const worst: Strategy = (
     board,
     costFunc,
     probFunc,
     capacity
-) {
-    const rtn = knapsack(board, costFunc, x => 1 / x.severity, capacity);
-    return rtn.subset.reduce((acc, v) => acc.add(v.key), new Set());
+) => {
+    const rtn = knapsack(board, costFunc, (x: Action) => 1 / x.severity, capacity).subset;
+    return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
-export function countMatches(state) {
-    return Array.from(state.attacking)
-        .filter(x => state.defending.has(x))
-        .reduce((a,v) => a+1, 0);
-}
 
-export const strategies = {
+
+export const strategies: {
+    [key:string]:Strategy;
+} = {
     best,
     worst,
 };
 
-export function evalFor(strat, player, board, capacity) {
+export function evalFor(strat: Strategy, player: Player, board: Board, capacity: number) {
     if (player === "attacker") {
-        return strat(board, x=>x.costAttack, x=>x.probAttack, capacity)
+        return strat(board, x=>x.attackCost, x=>x.attackProb, capacity)
     } else if (player === "defender") {
-        return strat(board, x=>x.costDefend, x=>x.probDefend, capacity)
+        return strat(board, x=>x.defendCost, x=>x.defendProb, capacity)
     }
     throw new Error("bad player");
 }
@@ -57,7 +56,11 @@ export function evaluateStrategies(
     attackingCapacity = 10,
     defendingCapacity = 10,
 ) {
-    const results = {};
+    const results: {
+        [key:string] : {
+            [key: string] : number[];
+        };
+    } = {};
     for (let i = 0; i < 100; i++) {
         const board = generateBoard();
         for (const [atkStratName, atkStratFunc] of Object.entries(strategies)) {

@@ -23,7 +23,15 @@ will return
 
 // https://gist.github.com/lqt0223/21f033450a9d762ce8aee4da336363b1
 
-export function knapsack(items, weightFunc, valueFunc, capacity) {
+export function knapsack<T>(
+    items: T[],
+    weightFunc: (v:T) => number,
+    valueFunc: (v:T) => number,
+    capacity: number
+): {
+    maxValue: number;
+    subset: T[];
+} {
     // This implementation uses dynamic programming.
     // Variable 'memo' is a grid(2-dimentional array) to store optimal solution for sub-problems,
     // which will be later used as the code execution goes on.

@@ -1,7 +1,8 @@
+import type { Action, Board } from "src/app.js";
 import { rand, randI } from "./utils";
 
 export function getRisk(action: import("src/app.js").Action) {
-    const rtn = action.severity ** 2 * action.probAttack * (1-action.probDefend) * (action.costDefend / action.costAttack);
+    const rtn = action.severity ** 2 * action.attackProb * (1-action.defendProb) * (action.defendCost / action.attackCost);
     return Math.round(rtn*100)/100;
 }
 
@@ -15,7 +16,7 @@ export function generateBoard(
     const rtn = [];
     for (let i=0; i<options.numComponents; i++) {
         for (let j=0; j<options.numVulnerabilities-options.weaknesses[i]; j++) {
-            const entry = {
+            const entry: Action = {
                 key: `${i},${j}`,
                 comp: i,
                 vuln: j,
@@ -24,6 +25,7 @@ export function generateBoard(
                 attackProb: rand(0.5, 0.98),
                 defendProb: rand(0.5, 0.98),
                 severity: randI(1,5),
+                risk: -1,
             };
             entry.risk = getRisk(entry);
             rtn.push(entry);
