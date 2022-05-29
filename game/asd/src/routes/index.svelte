@@ -11,8 +11,8 @@
 	let attackerMaxCost = 10;
 	let defenderMaxCost = 10;
 	let attackerMinProb = 0.1;
-	let attackerMaxProb = 0.1;
-	let defenderMinProb = 0.98;
+	let attackerMaxProb = 0.98;
+	let defenderMinProb = 0.1;
 	let defenderMaxProb = 0.98;
 
 	let attackerCapacity = 10;
@@ -62,7 +62,7 @@
 	<div style="margin: 5px;">
 		<Board {board} {attacking} {defending} on:toggle={toggle} />
 	</div>
-	<div>
+	<div style="margin:5px;">
 		<div>
 			<Stats {board} {attacking} {defending} />
 		</div>
