@@ -1,7 +1,7 @@
 import { knapsack } from "./knapsack";
 import { generateBoard } from "./board";
 import { toFixed } from "./utils";
-import type { Board, Strategy } from "src/app";
+import type { Action, Board, Player, Strategy } from "src/app";
 
 export function valueFunc(board: Board, attacking: Set<string>, defending: Set<string>) {
     const rtn = board
@@ -14,27 +14,34 @@ export function valueFunc(board: Board, attacking: Set<string>, defending: Set<s
     return Math.round(rtn * 100) / 100;
 }
 
-export const attackerBest: Strategy = (board, capacity) => {
-    const rtn = knapsack(board, x => x.attackCost, x => x.severity, capacity).subset;
+function getCostFunc(player: Player) {
+    return player === "attacker" ? (x: Action) => x.attackCost : (x: Action) => x.defendCost;
+}
+
+export const best: Strategy = (board, player, capacity) => {
+    const rtn = knapsack(board, getCostFunc(player), x => x.severity, capacity).subset;
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
-export const defenderBest: Strategy = (board, capacity) => {
-    const rtn = knapsack(board, x => x.defendCost, x => x.severity, capacity).subset;
+export const worst: Strategy = (board, player, capacity) => {
+    const rtn = knapsack(board, getCostFunc(player), x => 6 - x.severity, capacity).subset;
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
-export const attackerWorst: Strategy = (board, capacity) => {
-    const rtn = knapsack(board, x => x.attackCost, x => 1 / x.severity, capacity).subset;
-    return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
+export const random: Strategy = (board, player, capacity) => {
+    const rtn = new Set<string>();
+    while (capacity > 0) {
+        const candidates = board.filter(x => !rtn.has(x.key)).filter(x => getCostFunc(player)(x) <= capacity);
+        if (candidates.length === 0) return rtn;
+        const choice = Math.floor(Math.random() * candidates.length);
+        const entry = candidates[choice];
+        rtn.add(entry.key);
+        capacity -= getCostFunc(player)(entry);
+    }
+    return rtn;
 }
 
-export const defenderWorst: Strategy = (board, capacity) => {
-    const rtn = knapsack(board, x => x.defendCost, x => 1 / x.severity, capacity).subset;
-    return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
-}
-
-export const none: Strategy = (board, capacity) => {
+export const none: Strategy = (board, costFunc, capacity) => {
     return new Set<string>();
 }
 
@@ -42,16 +49,11 @@ export const none: Strategy = (board, capacity) => {
 export const strategies: {
     [key: string]: Strategy;
 } = {
-    attackerBest,
-    defenderBest,
-    attackerWorst,
-    defenderWorst,
+    best,
+    worst,
+    random,
     none,
 };
-
-export function applyStrat(strat: Strategy, board: Board, capacity: number) {
-    return strat(board, capacity)
-}
 
 export function evaluateStrategies(
     rounds = 100,
@@ -77,8 +79,8 @@ export function evaluateStrategies(
                 const entry = results[defStratName][atkStratName];
                 const state = {
                     board,
-                    attacking: applyStrat(atkStratFunc, board, attackingCapacity),
-                    defending: applyStrat(defStratFunc, board, defendingCapacity),
+                    attacking: atkStratFunc(board, "attacker", attackingCapacity),
+                    defending: defStratFunc(board, "defender", defendingCapacity),
                 }
                 entry.push(state);
             }

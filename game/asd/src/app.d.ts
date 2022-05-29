@@ -25,4 +25,4 @@ export type Board = Action[]
 
 export type Player = "attacker" | "defender"
 
-export type Strategy = ( board: Board, capacity: any ) => Set<string>
+export type Strategy = ( board: Board, player: Player, capacity: any ) => Set<string>

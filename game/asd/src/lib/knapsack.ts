@@ -37,7 +37,7 @@ export function knapsack<T>(
     // which will be later used as the code execution goes on.
     // This is called memoization in programming.
     // The cell will store best solution objects for different capacities and selectable items.
-    var memo = [];
+    var memo: any[] = [];
 
     // Filling the sub-problem solutions grid.
     for (var i = 0; i < items.length; i++) {
@@ -57,7 +57,7 @@ export function knapsack<T>(
         return lastRow[lastRow.length - 1];
     }
 
-    function getSolution(row, cap) {
+    function getSolution(row: any, cap:any) {
         const NO_SOLUTION = { maxValue: 0, subset: [] };
         // the column number starts from zero.
         var col = cap - 1;

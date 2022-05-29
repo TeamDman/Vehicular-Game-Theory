@@ -6,7 +6,7 @@
 	import Controls from '../components/Controls.svelte';
 	import { generateBoard } from '../lib/board';
 	import type { Action, Player } from 'src/app';
-	import { applyStrat, evaluateStrategies, strategies } from '$lib/solver';
+	import { evaluateStrategies, strategies } from '$lib/solver';
 
 	let attackerCapacity = 10;
 	let defenderCapacity = 10;
@@ -27,10 +27,10 @@
 	}
 
 	function attack(event: CustomEvent<keyof typeof strategies>) {
-		attacking = applyStrat(strategies[event.detail], board, attackerCapacity);
+		attacking = strategies[event.detail](board, "attacker", attackerCapacity);
 	}
 	function defend(event: CustomEvent<keyof typeof strategies>) {
-		defending = applyStrat(strategies[event.detail], board, defenderCapacity);
+		defending = strategies[event.detail](board, "attacker", defenderCapacity);
 	}
 
 	$: results = evaluateStrategies(100, attackerCapacity, defenderCapacity);
