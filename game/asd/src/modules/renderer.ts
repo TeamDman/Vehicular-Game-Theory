@@ -1,5 +1,5 @@
-import { valueFunc, strategies, countMatches } from "./solver.mjs";
-import { toFixed } from "./utils.mjs";
+import { valueFunc, strategies, countMatches } from "./solver";
+import { toFixed } from "./utils";
 
 function toggleMembership(set, action) {
     if (set.has(action.key)) set.delete(action.key);

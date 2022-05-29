@@ -28,8 +28,10 @@
                 Total defend cost: <span id="defendcost"></span>
                 <br>
                 Total value: <span id="total"></span>
+                <br>
+                Matches: <span id="matches"></span>
             </div>
-            <div>
+            <div style="margin-top:15px">
                 attacker: <select id="pickatk"></select>
                 capacity: <input id="atkcap" type="number" value=10>
                 <br>
@@ -37,6 +39,11 @@
                 capacity: <input id="defcap" type="number" value="10">
                 <br>
                 <button id="newboard" type="button">New board</button>
+                <br>
+                <br>
+                count: <input id="simcount" type="number" value="1000">
+                <br>
+                <button id="sim" type="button">Simulate</button>
             </div>
         </div>
     </div>
@@ -67,6 +74,10 @@
             renderBoard(state);
         });
         
+        document.querySelector("#simcount").addEventListener("click", e=>{
+
+        });
+
         renderAll(state);
     </script>
 </body>

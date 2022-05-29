@@ -1,6 +1,6 @@
-import { knapsack } from "./knapsack.mjs";
-import { generateBoard } from "./board.mjs";
-import { toFixed } from "./utils.mjs";
+import { knapsack } from "./knapsack";
+import { generateBoard } from "./board";
+import { toFixed } from "./utils";
 
 export function valueFunc(state) {
     const rtn = state.board
