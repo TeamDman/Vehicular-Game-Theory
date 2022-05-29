@@ -25,3 +25,8 @@ export function pickHex(color1: [number, number, number], color2: [number, numbe
 export function toSet<T>(list: T[]) {
     return list.reduce((acc,v) => acc.add(v), new Set<T>());
 }
+
+export function pickRandom<T>(list: T[]) {
+    const choice = Math.floor(Math.random() * list.length);
+    return list[choice];
+}

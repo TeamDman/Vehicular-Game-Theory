@@ -1,6 +1,6 @@
 import { knapsack } from "./knapsack";
 import { generateBoard, type BoardOptions } from "./board";
-import { toFixed } from "./utils";
+import { pickRandom, toFixed } from "./utils";
 import type { Action, Board, Player, Strategy } from "src/app";
 import { claim_space } from "svelte/internal";
 
@@ -29,6 +29,19 @@ export const bestRisk: Strategy = (board, player, capacity) => {
     return knapsack(board, getCostFunc(player), x => x.risk, capacity);
 }
 
+export const bestRiskRandom: Strategy = (board, player, capacity) => {
+    const rtn = new Set<Action>();
+    const costFunc = getCostFunc(player);
+    while (capacity > 0) {
+        const candidates = board.filter(x => !rtn.has(x)).filter(x => costFunc(x) <= capacity).sort((a,b) => b.risk - a.risk).slice(0, 5);
+        if (candidates.length === 0) return rtn;
+        const elem = pickRandom(Array.from(candidates));
+        capacity -= costFunc(elem);
+        rtn.add(elem);
+    }
+    return rtn;
+}
+
 // not the most cost-effective for us, but the defender wants to prioritize the items the opponent wants anyways
 export const bestGuess: Strategy = (board, player, capacity) => {
     const otherPlayer: Player = player === "attacker" ? "defender" : "attacker";
@@ -53,8 +66,7 @@ export const random: Strategy = (board, player, capacity) => {
     while (capacity > 0) {
         const candidates = board.filter(x => !rtn.has(x)).filter(x => getCostFunc(player)(x) <= capacity);
         if (candidates.length === 0) return rtn;
-        const choice = Math.floor(Math.random() * candidates.length);
-        const entry = candidates[choice];
+        const entry = pickRandom(candidates);
         rtn.add(entry);
         capacity -= getCostFunc(player)(entry);
     }
@@ -70,6 +82,7 @@ export const strategies: {
     [key: string]: Strategy;
 } = {
     bestRisk,
+    bestRiskRandom,
     bestGuess,
     bestSeverity,
     cheap,
