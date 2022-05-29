@@ -55,7 +55,8 @@
 		board = generateBoard(boardOptions);
 	}
 
-	$: results = evaluateStrategies(100, boardOptions, attackerCapacity, defenderCapacity);
+	let iterations = 100;
+	$: results = evaluateStrategies(iterations, boardOptions, attackerCapacity, defenderCapacity);
 </script>
 
 <div style="display:flex">
@@ -76,6 +77,7 @@
 				bind:defenderMaxProb
 				bind:attackerCapacity
 				bind:defenderCapacity
+				bind:iterations
 				on:newboard={newBoard}
 			/>
 		</div>

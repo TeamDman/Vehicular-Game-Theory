@@ -8,6 +8,7 @@
 	export let attackerMaxProb: number;
 	export let defenderMinProb: number;
 	export let defenderMaxProb: number;
+	export let iterations: number;
     const dispatch = createEventDispatcher();
 
 </script>
@@ -38,9 +39,11 @@
 <input type="range" min=1 max=100 bind:value={defenderCapacity}>
 <br>
 
+<p>Iterations: </p><input type=number bind:value={iterations}>
+
 <style>
 	input[type=number] {
-		width: 50px;
+		width: 60px;
 	}
 
 	p {

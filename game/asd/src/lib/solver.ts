@@ -17,6 +17,9 @@ export function valueFunc(board: Board, attacking: Set<string>, defending: Set<s
 function getCostFunc(player: Player) {
     return player === "attacker" ? (x: Action) => x.attackCost : (x: Action) => x.defendCost;
 }
+function getProbFunc(player: Player) {
+    return player === "attacker" ? (x: Action) => x.attackProb : (x: Action) => x.defendProb;
+}
 
 export const bestSeverity: Strategy = (board, player, capacity) => {
     const rtn = knapsack(board, getCostFunc(player), x => x.severity, capacity).subset;
@@ -28,8 +31,13 @@ export const bestRisk: Strategy = (board, player, capacity) => {
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
-export const worst: Strategy = (board, player, capacity) => {
-    const rtn = knapsack(board, getCostFunc(player), x => 6 - x.severity, capacity).subset;
+export const cheap: Strategy = (board, player, capacity) => {
+    const rtn = knapsack(board, getCostFunc(player), x => getCostFunc(player)(x), capacity).subset;
+    return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
+}
+
+export const worstRisk: Strategy = (board, player, capacity) => {
+    const rtn = knapsack(board, getCostFunc(player), x => 1/x.risk, capacity).subset;
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
@@ -54,10 +62,11 @@ export const none: Strategy = (board, costFunc, capacity) => {
 export const strategies: {
     [key: string]: Strategy;
 } = {
-    bestSeverity,
     bestRisk,
-    worst,
+    bestSeverity,
+    cheap,
     random,
+    worstRisk,
     none,
 };
 
