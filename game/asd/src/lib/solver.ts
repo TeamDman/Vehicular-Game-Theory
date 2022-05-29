@@ -3,7 +3,7 @@ import { generateBoard } from "./board";
 import { toFixed } from "./utils";
 import type { Action, Board, Player, State, Strategy } from "src/app";
 
-export function valueFunc(state: State) {
+export function valueFunc(state: Omit<State, "attackerCapacity" | "defenderCapacity">) {
     const rtn = state.board
         .filter(v => state.attacking.has(v.key))
         .reduce((acc, v) => {
@@ -34,6 +34,9 @@ export const worst: Strategy = (
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
+export const none: Strategy = ( board, costFunc, probFunc, capacity ) => {
+    return new Set<string>();
+}
 
 
 export const strategies: {
@@ -41,9 +44,10 @@ export const strategies: {
 } = {
     best,
     worst,
+    none,
 };
 
-export function evalFor(strat: Strategy, player: Player, board: Board, capacity: number) {
+export function applyStrat(strat: Strategy, player: Player, board: Board, capacity: number) {
     if (player === "attacker") {
         return strat(board, x=>x.attackCost, x=>x.attackProb, capacity)
     } else if (player === "defender") {
@@ -53,6 +57,7 @@ export function evalFor(strat: Strategy, player: Player, board: Board, capacity:
 }
 
 export function evaluateStrategies(
+    rounds = 100,
     attackingCapacity = 10,
     defendingCapacity = 10,
 ) {
@@ -61,31 +66,32 @@ export function evaluateStrategies(
             [key: string] : number[];
         };
     } = {};
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < rounds; i++) {
         const board = generateBoard();
-        for (const [atkStratName, atkStratFunc] of Object.entries(strategies)) {
-            if (results?.[atkStratName] === undefined) results[atkStratName] = {};
-            for (const [defStratName, defStratFunc] of Object.entries(strategies)) {
-                if (results[atkStratName]?.[defStratName] === undefined) results[atkStratName][defStratName] = [];
-                const entry = results[atkStratName][defStratName];
+        for (const [defStratName, defStratFunc] of Object.entries(strategies)) {
+            if (results?.[defStratName] === undefined) results[defStratName] = {};
+            for (const [atkStratName, atkStratFunc] of Object.entries(strategies)) {
+                if (results[defStratName]?.[atkStratName] === undefined) results[defStratName][atkStratName] = [];
+                const entry = results[defStratName][atkStratName];
                 const state = {
                     board,
-                    attacking: evalFor(atkStratFunc, "attacker", board, attackingCapacity),
-                    defending: evalFor(defStratFunc, "defender", board, defendingCapacity),
+                    attacking: applyStrat(atkStratFunc, "attacker", board, attackingCapacity),
+                    defending: applyStrat(defStratFunc, "defender", board, defendingCapacity),
                 }
                 entry.push(valueFunc(state));
             }
         }
     }
-    const rtn = [];
-    for (const [atkName, atkVal] of Object.entries(results)) {
-        for (const [defName, defVal] of Object.entries(atkVal)) {
-            rtn.push({
-                attackStrat: atkName,
-                defendStrat: defName,
-                average: toFixed(defVal.reduce((acc, v) => acc + v, 0) / defVal.length),
-            });
-        }
-    }
-    return rtn;
+    return results;
+    // const rtn = [];
+    // for (const [atkName, atkVal] of Object.entries(results)) {
+    //     for (const [defName, defVal] of Object.entries(atkVal)) {
+    //         rtn.push({
+    //             attackStrat: atkName,
+    //             defendStrat: defName,
+    //             average: toFixed(defVal.reduce((acc, v) => acc + v, 0) / defVal.length),
+    //         });
+    //     }
+    // }
+    // return rtn;
 }

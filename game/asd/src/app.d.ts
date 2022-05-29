@@ -29,6 +29,8 @@ export type State = {
 	board: Board;
 	attacking: Set<string>;
 	defending: Set<string>;
+	attackerCapacity: number;
+	defenderCapacity: number;
 }
 
 export type Strategy = (

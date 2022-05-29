@@ -25,6 +25,8 @@
 	}
 </script>
 
+Board example
+
 <table>
 	<thead>
 		<tr>

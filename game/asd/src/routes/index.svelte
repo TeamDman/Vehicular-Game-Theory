@@ -1,15 +1,19 @@
 <script lang="ts">
+    import ScoreBoard from "../components/ScoreBoard.svelte";
     import Board from "../components/Board.svelte"
     import Stats from "../components/Stats.svelte"
     import Controls from "../components/Controls.svelte"
     import {generateBoard} from "../lib/board";
     import type { Action, Player, State} from "src/app";
+import { applyStrat, strategies } from "$lib/solver";
 
     const board = generateBoard();
     let state: State = {
         board,
         attacking: new Set(),
         defending: new Set(),
+        attackerCapacity: 10,
+        defenderCapacity: 10,
     };
 
     function newBoard() {
@@ -26,10 +30,17 @@
         state.attacking = state.attacking;
         state.defending = state.defending;
     }
+
+    function attack(event: CustomEvent<keyof typeof strategies>) {
+        state.attacking = applyStrat(strategies[event.detail], "attacker", state.board, state.attackerCapacity);
+    }
+    function defend(event: CustomEvent<keyof typeof strategies>) {
+        state.defending = applyStrat(strategies[event.detail], "defender", state.board, state.defenderCapacity);
+    }
 </script>
 
 <div style="display:flex">
-    <div style="margin-right:5px">
+    <div style="margin: 5px;">
         <Board state={state} on:toggle={toggle}/>
     </div>
     <div>
@@ -37,7 +48,12 @@
             <Stats state={state}/>
         </div>
         <div style="margin-top:10px;">
-            <Controls on:newboard={newBoard}/>
+            <Controls state={state} on:newboard={newBoard}/>
         </div>
     </div>
+</div>
+
+
+<div style="margin: 5px;">
+    <ScoreBoard on:attack={attack} on:defend={defend}/>
 </div>
