@@ -1,5 +1,5 @@
 import { knapsack } from "./knapsack";
-import { generateBoard } from "./board";
+import { generateBoard, type BoardOptions } from "./board";
 import { toFixed } from "./utils";
 import type { Action, Board, Player, Strategy } from "src/app";
 
@@ -22,6 +22,10 @@ export const best: Strategy = (board, player, capacity) => {
     const rtn = knapsack(board, getCostFunc(player), x => x.severity, capacity).subset;
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
+
+// export const bestOther: Strategy = (board, player, capacity) => {
+    
+// }
 
 export const worst: Strategy = (board, player, capacity) => {
     const rtn = knapsack(board, getCostFunc(player), x => 6 - x.severity, capacity).subset;
@@ -56,9 +60,10 @@ export const strategies: {
 };
 
 export function evaluateStrategies(
-    rounds = 100,
-    attackingCapacity = 10,
-    defendingCapacity = 10,
+    rounds: number,
+    boardOptions: BoardOptions,
+    attackingCapacity: number,
+    defendingCapacity: number,
 ) {
     console.log(`Evaluating ${rounds} rounds`);
     const results: {
@@ -71,7 +76,7 @@ export function evaluateStrategies(
         };
     } = {};
     for (let i = 0; i < rounds; i++) {
-        const board = generateBoard();
+        const board = generateBoard(boardOptions);
         for (const [defStratName, defStratFunc] of Object.entries(strategies)) {
             if (results?.[defStratName] === undefined) results[defStratName] = {};
             for (const [atkStratName, atkStratFunc] of Object.entries(strategies)) {

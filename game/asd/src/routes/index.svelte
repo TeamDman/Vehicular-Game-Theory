@@ -4,19 +4,36 @@
 	import Board from '../components/Board.svelte';
 	import Stats from '../components/Stats.svelte';
 	import Controls from '../components/Controls.svelte';
-	import { generateBoard } from '../lib/board';
+	import { generateBoard, type BoardOptions } from '../lib/board';
 	import type { Action, Player } from 'src/app';
 	import { evaluateStrategies, strategies } from '$lib/solver';
 
+	let attackerMaxCost = 10;
+	let defenderMaxCost = 10;
+	let attackerMinProb = 0.1;
+	let attackerMaxProb = 0.1;
+	let defenderMinProb = 0.98;
+	let defenderMaxProb = 0.98;
+
 	let attackerCapacity = 10;
 	let defenderCapacity = 10;
-	let board = generateBoard();
+
+	$: boardOptions = {
+		numComponents: 5,
+		numVulnerabilities: 4,
+		weaknesses: [0,1,3,2,0],
+		attackerMaxCost,
+		defenderMaxCost,
+		attackerMinProb,
+		attackerMaxProb,
+		defenderMinProb,
+		defenderMaxProb,
+	};
+
+	$: board = generateBoard(boardOptions);
 	let attacking = new Set<string>();
 	let defending = new Set<string>();
 
-	function newBoard() {
-		board = generateBoard();
-	}
 
 	function toggle(event: CustomEvent<{ action: Action; player: Player }>) {
 		const set = event.detail.player === 'attacker' ? attacking : defending;
@@ -27,32 +44,46 @@
 	}
 
 	function attack(event: CustomEvent<keyof typeof strategies>) {
-		attacking = strategies[event.detail](board, "attacker", attackerCapacity);
+		attacking = strategies[event.detail](board, 'attacker', attackerCapacity);
 	}
 	function defend(event: CustomEvent<keyof typeof strategies>) {
-		defending = strategies[event.detail](board, "attacker", defenderCapacity);
+		defending = strategies[event.detail](board, 'attacker', defenderCapacity);
 	}
 
-	$: results = evaluateStrategies(100, attackerCapacity, defenderCapacity);
+	
+	function newBoard() {
+		board = generateBoard(boardOptions);
+	}
+
+	$: results = evaluateStrategies(100, boardOptions, attackerCapacity, defenderCapacity);
 </script>
 
 <div style="display:flex">
 	<div style="margin: 5px;">
-		<Board board={board} attacking={attacking} defending={defending} on:toggle={toggle} />
+		<Board {board} {attacking} {defending} on:toggle={toggle} />
 	</div>
 	<div>
 		<div>
-			<Stats board={board} attacking={attacking} defending={defending} />
+			<Stats {board} {attacking} {defending} />
 		</div>
 		<div style="margin-top:10px;">
-			<Controls bind:attackerCapacity={attackerCapacity} bind:defenderCapacity={defenderCapacity} on:newboard={newBoard} />
+			<Controls
+				bind:attackerMaxCost
+				bind:defenderMaxCost
+				bind:attackerMinProb
+				bind:attackerMaxProb
+				bind:defenderMinProb
+				bind:defenderMaxProb
+				bind:attackerCapacity
+				bind:defenderCapacity
+				on:newboard={newBoard}
+			/>
 		</div>
 	</div>
-</div>
-
-<div style="margin: 5px;">
-	<ValueBoard {results} on:attack={attack} on:defend={defend} />
-</div>
-<div style="margin: 5px;">
-	<MatchBoard {results} on:attack={attack} on:defend={defend} />
+	<div style="margin: 5px;">
+		<ValueBoard {results} on:attack={attack} on:defend={defend} />
+	</div>
+	<div style="margin: 5px;">
+		<MatchBoard {results} on:attack={attack} on:defend={defend} />
+	</div>
 </div>
