@@ -10,6 +10,6 @@
 
 Attacker capacity: <input type=number bind:value={state.attackerCapacity} min=1 max=100>
 <br>
-Defender capacity: <input type=number bind:value={state.attackerCapacity} min=1 max=100>
+Defender capacity: <input type=number bind:value={state.defenderCapacity} min=1 max=100>
 <br>
 <button on:click={()=>dispatch("newboard")}>New board</button>
