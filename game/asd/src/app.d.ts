@@ -25,12 +25,4 @@ export type Board = Action[]
 
 export type Player = "attacker" | "defender"
 
-export type State = {
-	board: Board;
-	attacking: Set<string>;
-	defending: Set<string>;
-	attackerCapacity: number;
-	defenderCapacity: number;
-}
-
 export type Strategy = ( board: Board, capacity: any ) => Set<string>

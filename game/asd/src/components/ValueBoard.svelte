@@ -1,16 +1,19 @@
 <script lang="ts">
-	import type { Action, Player, State } from 'src/app';
 	import { createEventDispatcher } from 'svelte';
 	import { evaluateStrategies, strategies, valueFunc } from '$lib/solver';
 	import { pickHex, toFixed } from '$lib/utils';
 
+	export let results: ReturnType<typeof evaluateStrategies>;
+
 	const dispatch = createEventDispatcher();
 
 	const strats = Object.keys(strategies);
-	$: results = evaluateStrategies(100);
 
-	function average(states: Pick<State, 'attacking' | 'defending' | 'board'>[]) {
-		return toFixed(states.map(valueFunc).reduce((a, v) => a + v, 0) / states.length);
+	function average(states: ReturnType<typeof evaluateStrategies>[string][string]) {
+		return toFixed(
+			states.map((x) => valueFunc(x.board, x.attacking, x.defending)).reduce((a, v) => a + v, 0) /
+				states.length
+		);
 	}
 
 	$: maxResult = Object.values(results)

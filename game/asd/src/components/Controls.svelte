@@ -1,15 +1,14 @@
 <script lang="ts">
-    import type { State } from 'src/app';
-
 	import { createEventDispatcher } from 'svelte';
-	export let state: State;
+	export let attackerCapacity: number;
+	export let defenderCapacity: number;
 
     const dispatch = createEventDispatcher();
 
 </script>
 
-Attacker capacity: <input type=number bind:value={state.attackerCapacity} min=1 max=100>
+Attacker capacity: <input type=number bind:value={attackerCapacity} min=1 max=100>
 <br>
-Defender capacity: <input type=number bind:value={state.defenderCapacity} min=1 max=100>
+Defender capacity: <input type=number bind:value={defenderCapacity} min=1 max=100>
 <br>
 <button on:click={()=>dispatch("newboard")}>New board</button>

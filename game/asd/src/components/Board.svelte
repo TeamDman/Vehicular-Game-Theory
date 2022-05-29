@@ -1,15 +1,18 @@
 <script lang="ts">
-	import type { Action, Player, State } from 'src/app';
+	import type { Action, Board, Player } from 'src/app';
 	import { createEventDispatcher } from 'svelte';
 
-	export let state: State;
+	export let board: Board;
+	export let attacking: Set<string>;
+	export let defending: Set<string>;
+
 	const dispatch = createEventDispatcher();
 
-	$: componentCount = state.board.map((x) => x.comp).reduce((a, v) => Math.max(a, v + 1), 0);
-	$: vulnCount = state.board.map((x) => x.vuln).reduce((a, v) => Math.max(a, v + 1), 0);
+	$: componentCount = board.map((x) => x.comp).reduce((a, v) => Math.max(a, v + 1), 0);
+	$: vulnCount = board.map((x) => x.vuln).reduce((a, v) => Math.max(a, v + 1), 0);
 
-	function getAction(state: State, i: number, j: number) {
-		return state.board.find((x) => x.comp === i && x.vuln === j) ?? null;
+	function getAction(board: Board, i: number, j: number) {
+		return board.find((x) => x.comp === i && x.vuln === j) ?? null;
 	}
 	function getDesc(action?: Action) {
 		if (action === null) return '';
@@ -41,14 +44,14 @@ Board example
 			<tr>
 				<td>Comp {i}</td>
 				{#each Array(vulnCount) as _, j}
-					{@const action = getAction(state, i, j)}
+					{@const action = getAction(board, i, j)}
 					{#if action}
 						<td
 							on:click={() => toggle(action, 'attacker')}
 							on:contextmenu|preventDefault={() => toggle(action, 'defender')}
 							class="noselect"
-							class:attacking="{state.attacking.has(action.key)}"
-							class:defending="{state.defending.has(action.key)}"
+							class:attacking="{attacking.has(action.key)}"
+							class:defending="{defending.has(action.key)}"
 						>
 							{getDesc(action)}</td
 						>

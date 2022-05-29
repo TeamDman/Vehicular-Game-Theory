@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Action, Player, State } from 'src/app';
 	import { createEventDispatcher } from 'svelte';
 	import { evaluateStrategies, strategies, valueFunc } from '$lib/solver';
 	import { pickHex, toFixed } from '$lib/utils';
@@ -7,9 +6,9 @@
 	const dispatch = createEventDispatcher();
 
 	const strats = Object.keys(strategies);
-	$: results = evaluateStrategies(100);
+	export let results: ReturnType<typeof evaluateStrategies>;
 
-	function calc(states: Pick<State, "attacking" | "defending" | "board">[]) {
+	function calc(states: ReturnType<typeof evaluateStrategies>[string][string]) {
 		let matches = 0;
 		let total = 0;
 		for (const state of states) {
