@@ -2,6 +2,7 @@ import { knapsack } from "./knapsack";
 import { generateBoard, type BoardOptions } from "./board";
 import { toFixed } from "./utils";
 import type { Action, Board, Player, Strategy } from "src/app";
+import { claim_space } from "svelte/internal";
 
 export function valueFunc(board: Board, attacking: Set<string>, defending: Set<string>) {
     const rtn = board
@@ -29,6 +30,23 @@ export const bestSeverity: Strategy = (board, player, capacity) => {
 export const bestRisk: Strategy = (board, player, capacity) => {
     const rtn = knapsack(board, getCostFunc(player), x => x.risk, capacity).subset;
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
+}
+
+// not the most cost-effective for us, but the defender wants to prioritize the items the opponent wants anyways
+export const bestGuess: Strategy = (board, player, capacity) => {
+    const otherPlayer: Player = player === "attacker" ? "defender" : "attacker";
+    const costFunc = getCostFunc(player);
+    const theirGoal = bestRisk(board, otherPlayer, capacity); // assume same capacity
+    const rtn = bestRisk(board.filter(x => theirGoal.has(x.key)), player, capacity);
+    for (const x of board) { // try and fill any remaining space we have
+        if (rtn.has(x.key)) continue;
+        if (costFunc(x) <= capacity) {
+            rtn.add(x.key);
+            capacity -= costFunc(x);
+        }
+    }
+    return rtn;
+
 }
 
 export const cheap: Strategy = (board, player, capacity) => {
@@ -63,6 +81,7 @@ export const strategies: {
     [key: string]: Strategy;
 } = {
     bestRisk,
+    bestGuess,
     bestSeverity,
     cheap,
     random,
