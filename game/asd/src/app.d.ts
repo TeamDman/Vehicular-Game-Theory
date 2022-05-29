@@ -33,9 +33,4 @@ export type State = {
 	defenderCapacity: number;
 }
 
-export type Strategy = (
-	board: Board,
-	costFunc: (v: Action) => number,
-	probFunc: (v: Action) => number,
-	capacity: any
-) => Set<string>
+export type Strategy = ( board: Board, capacity: any ) => Set<string>

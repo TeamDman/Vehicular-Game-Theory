@@ -3,57 +3,54 @@ import { generateBoard } from "./board";
 import { toFixed } from "./utils";
 import type { Action, Board, Player, State, Strategy } from "src/app";
 
-export function valueFunc(state: Omit<State, "attackerCapacity" | "defenderCapacity">) {
+export function valueFunc(state: Pick<State, "board" | "attacking" | "defending">) {
     const rtn = state.board
         .filter(v => state.attacking.has(v.key))
         .reduce((acc, v) => {
             let inc = (v.severity ** 2) * v.attackProb;
-            if (state.defending.has(v.key)) inc *= 1-v.defendProb;
+            if (state.defending.has(v.key)) inc *= 1 - v.defendProb;
             return acc + inc;
         }, 0);
-    return Math.round(rtn*100)/100;
+    return Math.round(rtn * 100) / 100;
 }
 
-export const best: Strategy = (
-    board,
-    costFunc,
-    probFunc,
-    capacity
-) => {
-    const rtn = knapsack(board, costFunc, (x: Action) => x.severity, capacity).subset;
+export const attackerBest: Strategy = (board, capacity) => {
+    const rtn = knapsack(board, x => x.attackCost, x => x.severity, capacity).subset;
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
-export const worst: Strategy = (
-    board,
-    costFunc,
-    probFunc,
-    capacity
-) => {
-    const rtn = knapsack(board, costFunc, (x: Action) => 1 / x.severity, capacity).subset;
+export const defenderBest: Strategy = (board, capacity) => {
+    const rtn = knapsack(board, x => x.defendCost, x => x.severity, capacity).subset;
     return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
 }
 
-export const none: Strategy = ( board, costFunc, probFunc, capacity ) => {
+export const attackerWorst: Strategy = ( board, capacity ) => {
+    const rtn = knapsack(board, x=>x.attackCost, x => 1 / x.severity, capacity).subset;
+    return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
+}
+
+export const defenderWorst: Strategy = ( board, capacity ) => {
+    const rtn = knapsack(board, x=>x.defendCost, x => 1 / x.severity, capacity).subset;
+    return rtn.reduce((acc, v) => acc.add(v.key), new Set<string>());
+}
+
+export const none: Strategy = (board, capacity) => {
     return new Set<string>();
 }
 
 
 export const strategies: {
-    [key:string]:Strategy;
+    [key: string]: Strategy;
 } = {
-    best,
-    worst,
+    attackerBest,
+    defenderBest,
+    attackerWorst,
+    defenderWorst,
     none,
 };
 
-export function applyStrat(strat: Strategy, player: Player, board: Board, capacity: number) {
-    if (player === "attacker") {
-        return strat(board, x=>x.attackCost, x=>x.attackProb, capacity)
-    } else if (player === "defender") {
-        return strat(board, x=>x.defendCost, x=>x.defendProb, capacity)
-    }
-    throw new Error("bad player");
+export function applyStrat(strat: Strategy, board: Board, capacity: number) {
+    return strat(board, capacity)
 }
 
 export function evaluateStrategies(
@@ -62,8 +59,8 @@ export function evaluateStrategies(
     defendingCapacity = 10,
 ) {
     const results: {
-        [key:string] : {
-            [key: string] : number[];
+        [key: string]: {
+            [key: string]: Pick<State, "board" | "attacking" | "defending">[];
         };
     } = {};
     for (let i = 0; i < rounds; i++) {
@@ -75,10 +72,10 @@ export function evaluateStrategies(
                 const entry = results[defStratName][atkStratName];
                 const state = {
                     board,
-                    attacking: applyStrat(atkStratFunc, "attacker", board, attackingCapacity),
-                    defending: applyStrat(defStratFunc, "defender", board, defendingCapacity),
+                    attacking: applyStrat(atkStratFunc, board, attackingCapacity),
+                    defending: applyStrat(defStratFunc, board, defendingCapacity),
                 }
-                entry.push(valueFunc(state));
+                entry.push(state);
             }
         }
     }

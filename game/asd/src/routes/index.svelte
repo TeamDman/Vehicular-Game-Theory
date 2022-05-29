@@ -1,5 +1,6 @@
 <script lang="ts">
-    import ScoreBoard from "../components/ScoreBoard.svelte";
+    import ValueBoard from "../components/ValueBoard.svelte";
+    import MatchBoard from "../components/MatchBoard.svelte";
     import Board from "../components/Board.svelte"
     import Stats from "../components/Stats.svelte"
     import Controls from "../components/Controls.svelte"
@@ -55,5 +56,8 @@ import { applyStrat, strategies } from "$lib/solver";
 
 
 <div style="margin: 5px;">
-    <ScoreBoard on:attack={attack} on:defend={defend}/>
+    <ValueBoard on:attack={attack} on:defend={defend}/>
+</div>
+<div style="margin: 5px;">
+    <MatchBoard on:attack={attack} on:defend={defend}/>
 </div>
