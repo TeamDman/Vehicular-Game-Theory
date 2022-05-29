@@ -13,34 +13,34 @@
 
 </script>
 
+<div style="min-width: 200px">
+	<div>
+		<p>attackerMaxCost: </p><input type=number bind:value={attackerMaxCost} min=1 max=100>
+		<br>
+		<p>defenderMaxCost: </p><input type=number bind:value={defenderMaxCost} min=1 max=100>
+		<br>
+		<p>attackerMinProb: </p><input type=number bind:value={attackerMinProb} step=0.01 min=0.1 max=1>
+		<br>
+		<p>attackerMaxProb: </p><input type=number bind:value={attackerMaxProb} step=0.01 min=0.1 max=1>
+		<br>
+		<p>defenderMinProb: </p><input type=number bind:value={defenderMinProb} step=0.01 min=0.1 max=1>
+		<br>
+		<p>defenderMaxProb: </p><input type=number bind:value={defenderMaxProb} step=0.01 min=0.1 max=1>
+		<br>
+		<button on:click={()=>dispatch("newboard")}>New board</button>
+	</div>
 
-<div>
-	<p>attackerMaxCost: </p><input type=number bind:value={attackerMaxCost} min=1 max=100>
+	<p>Attacker capacity: </p><input type=number bind:value={attackerCapacity} min=1 max=100>
 	<br>
-	<p>defenderMaxCost: </p><input type=number bind:value={defenderMaxCost} min=1 max=100>
+	<input type="range" min=1 max=100 bind:value={attackerCapacity}>
 	<br>
-	<p>attackerMinProb: </p><input type=number bind:value={attackerMinProb} step=0.01 min=0.1 max=1>
+	<p>Defender capacity: </p><input type=number bind:value={defenderCapacity} min=1 max=100>
 	<br>
-	<p>attackerMaxProb: </p><input type=number bind:value={attackerMaxProb} step=0.01 min=0.1 max=1>
+	<input type="range" min=1 max=100 bind:value={defenderCapacity}>
 	<br>
-	<p>defenderMinProb: </p><input type=number bind:value={defenderMinProb} step=0.01 min=0.1 max=1>
-	<br>
-	<p>defenderMaxProb: </p><input type=number bind:value={defenderMaxProb} step=0.01 min=0.1 max=1>
-	<br>
-	<button on:click={()=>dispatch("newboard")}>New board</button>
+
+	<p>Iterations: </p><input type=number bind:value={iterations}>
 </div>
-
-<p>Attacker capacity: </p><input type=number bind:value={attackerCapacity} min=1 max=100>
-<br>
-<input type="range" min=1 max=100 bind:value={attackerCapacity}>
-<br>
-<p>Defender capacity: </p><input type=number bind:value={defenderCapacity} min=1 max=100>
-<br>
-<input type="range" min=1 max=100 bind:value={defenderCapacity}>
-<br>
-
-<p>Iterations: </p><input type=number bind:value={iterations}>
-
 <style>
 	input[type=number] {
 		width: 60px;
