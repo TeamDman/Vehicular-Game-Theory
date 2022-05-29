@@ -10,7 +10,6 @@ declare namespace App {
 }
 
 export type Action = {
-	key: string;
 	comp: number;
 	vuln: number;
 	attackCost: number;

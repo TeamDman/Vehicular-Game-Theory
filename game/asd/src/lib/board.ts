@@ -23,7 +23,6 @@ export function generateBoard( options: BoardOptions ): Board {
     for (let i=0; i<options.numComponents; i++) {
         for (let j=0; j<options.numVulnerabilities-options.weaknesses[i]; j++) {
             const entry: Action = {
-                key: `${i},${j}`,
                 comp: i,
                 vuln: j,
                 attackCost: randI(1, options.attackerMaxCost),
