@@ -31,14 +31,14 @@
 	};
 
 	$: board = generateBoard(boardOptions);
-	let attacking = new Set<string>();
-	let defending = new Set<string>();
+	let attacking: Set<Action> = new Set();
+	let defending: Set<Action> = new Set();
 
 
 	function toggle(event: CustomEvent<{ action: Action; player: Player }>) {
 		const set = event.detail.player === 'attacker' ? attacking : defending;
-		if (set.has(event.detail.action.key)) set.delete(event.detail.action.key);
-		else set.add(event.detail.action.key);
+		if (set.has(event.detail.action)) set.delete(event.detail.action);
+		else set.add(event.detail.action);
 		attacking = attacking;
 		defending = defending;
 	}
@@ -47,7 +47,7 @@
 		attacking = strategies[event.detail](board, 'attacker', attackerCapacity);
 	}
 	function defend(event: CustomEvent<keyof typeof strategies>) {
-		defending = strategies[event.detail](board, 'attacker', defenderCapacity);
+		defending = strategies[event.detail](board, 'defender', defenderCapacity);
 	}
 
 	
@@ -82,10 +82,12 @@
 			/>
 		</div>
 	</div>
-	<div style="margin: 5px;">
-		<ValueBoard {results} on:attack={attack} on:defend={defend} />
-	</div>
-	<div style="margin: 5px;">
-		<MatchBoard {results} on:attack={attack} on:defend={defend} />
+	<div>
+		<div style="margin: 5px;">
+			<ValueBoard {results} on:attack={attack} on:defend={defend} />
+		</div>
+		<div style="margin: 5px;">
+			<MatchBoard {results} on:attack={attack} on:defend={defend} />
+		</div>
 	</div>
 </div>

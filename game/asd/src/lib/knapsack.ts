@@ -21,6 +21,9 @@ will return
 
 */
 
+import type { Action } from "src/app";
+import { toSet } from "./utils";
+
 // https://gist.github.com/lqt0223/21f033450a9d762ce8aee4da336363b1
 
 export function knapsack<T>(
@@ -28,10 +31,9 @@ export function knapsack<T>(
     weightFunc: (v:T) => number,
     valueFunc: (v:T) => number,
     capacity: number
-): {
-    maxValue: number;
-    subset: T[];
-} {
+): Set<Action> {
+    if (capacity == 0) return new Set<Action>();
+
     // This implementation uses dynamic programming.
     // Variable 'memo' is a grid(2-dimentional array) to store optimal solution for sub-problems,
     // which will be later used as the code execution goes on.
@@ -50,7 +52,7 @@ export function knapsack<T>(
     }
 
     // The right-bottom-corner cell of the grid contains the final solution for the whole problem.
-    return (getLast());
+    return toSet(getLast().subset);
 
     function getLast() {
         var lastRow = memo[memo.length - 1];

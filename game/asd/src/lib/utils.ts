@@ -21,3 +21,7 @@ export function pickHex(color1: [number, number, number], color2: [number, numbe
         Math.round(color1[2] * w1 + color2[2] * w2)];
     return rgb;
 }
+
+export function toSet<T>(list: T[]) {
+    return list.reduce((acc,v) => acc.add(v), new Set<T>());
+}

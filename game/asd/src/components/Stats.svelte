@@ -4,14 +4,14 @@
 	import { valueFunc } from '$lib/solver';
 
 	export let board: Board;
-	export let attacking: Set<string>;
-	export let defending: Set<string>;
+	export let attacking: Set<Action>;
+	export let defending: Set<Action>;
 
 	$: attackCost = board
-		.filter((x) => attacking.has(x.key))
+		.filter((x) => attacking.has(x))
 		.reduce((a, b) => (a += b.attackCost), 0);
 	$: defendCost = board
-		.filter((x) => defending.has(x.key))
+		.filter((x) => defending.has(x))
 		.reduce((a, b) => (a += b.defendCost), 0);
 
 	$: total = valueFunc(board, attacking, defending);

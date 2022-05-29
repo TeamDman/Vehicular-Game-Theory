@@ -3,8 +3,8 @@
 	import { createEventDispatcher } from 'svelte';
 
 	export let board: Board;
-	export let attacking: Set<string>;
-	export let defending: Set<string>;
+	export let attacking: Set<Action>;
+	export let defending: Set<Action>;
 
 	const dispatch = createEventDispatcher();
 
@@ -50,8 +50,8 @@ Board example
 							on:click={() => toggle(action, 'attacker')}
 							on:contextmenu|preventDefault={() => toggle(action, 'defender')}
 							class="noselect"
-							class:attacking="{attacking.has(action.key)}"
-							class:defending="{defending.has(action.key)}"
+							class:attacking="{attacking.has(action)}"
+							class:defending="{defending.has(action)}"
 						>
 							{getDesc(action)}</td
 						>
