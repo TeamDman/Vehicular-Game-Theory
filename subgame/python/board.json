@@ -4,7 +4,7 @@
             "comp": 0,
             "vuln": 0
         },
-        "attackerCost": 1,
+        "attackerCost": 4,
         "defenderCost": 4,
         "attackerProb": 0.79,
         "defenderProb": 0.69,
@@ -16,8 +16,8 @@
             "comp": 0,
             "vuln": 1
         },
-        "attackerCost": 1,
-        "defenderCost": 3,
+        "attackerCost": 4,
+        "defenderCost": 4,
         "attackerProb": 0.82,
         "defenderProb": 0.97,
         "severity": 4,
@@ -34,29 +34,5 @@
         "defenderProb": 0.77,
         "severity": 4,
         "risk": 1.84
-    },
-    {
-        "attack": {
-            "comp": 0,
-            "vuln": 3
-        },
-        "attackerCost": 4,
-        "defenderCost": 2,
-        "attackerProb": 0.61,
-        "defenderProb": 0.53,
-        "severity": 1,
-        "risk": 0.14
-    },
-    {
-        "attack": {
-            "comp": 1,
-            "vuln": 0
-        },
-        "attackerCost": 4,
-        "defenderCost": 4,
-        "attackerProb": 0.52,
-        "defenderProb": 0.69,
-        "severity": 4,
-        "risk": 2.58
     }
 ]
