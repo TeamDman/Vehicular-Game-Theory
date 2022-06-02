@@ -42,6 +42,11 @@ export const bestRiskRandom: Strategy = (board, player, capacity) => {
     return rtn;
 }
 
+export const even: Strategy = (board, player, capacity) => {
+    const costFunc = getCostFunc(player);
+    return knapsack(board.filter(x => costFunc(x) % 2 === 1), costFunc, x => x.risk, capacity);
+}
+
 // not the most cost-effective for us, but the defender wants to prioritize the items the opponent wants anyways
 export const bestGuess: Strategy = (board, player, capacity) => {
     const otherPlayer: Player = player === "attacker" ? "defender" : "attacker";
@@ -82,9 +87,10 @@ export const strategies: {
     [key: string]: Strategy;
 } = {
     bestRisk,
-    bestRiskRandom,
     bestGuess,
     bestSeverity,
+    bestRiskRandom,
+    even,
     cheap,
     random,
     worstRisk,

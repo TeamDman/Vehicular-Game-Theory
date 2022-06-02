@@ -32,7 +32,8 @@ export function knapsack<T>(
     valueFunc: (v:T) => number,
     capacity: number
 ): Set<Action> {
-    if (capacity == 0) return new Set<Action>();
+    if (capacity === 0) return new Set<Action>();
+    if (items.length === 0) return new Set<Action>();
 
     // This implementation uses dynamic programming.
     // Variable 'memo' is a grid(2-dimentional array) to store optimal solution for sub-problems,
