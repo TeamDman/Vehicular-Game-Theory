@@ -16,8 +16,8 @@
             "comp": 0,
             "vuln": 1
         },
-        "attackerCost": 4,
-        "defenderCost": 4,
+        "attackerCost": 1,
+        "defenderCost": 3,
         "attackerProb": 0.82,
         "defenderProb": 0.97,
         "severity": 4,
@@ -33,6 +33,18 @@
         "attackerProb": 0.5,
         "defenderProb": 0.77,
         "severity": 4,
+        "risk": 1.84
+    },
+    {
+        "attack": {
+            "comp": 0,
+            "vuln": 2
+        },
+        "attackerCost": 5,
+        "defenderCost": 5,
+        "attackerProb": 0.6,
+        "defenderProb": 0.77,
+        "severity": 3,
         "risk": 1.84
     }
 ]
