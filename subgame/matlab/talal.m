@@ -53,14 +53,20 @@ for C=[100 200 300 400 500]
     for n=1:C
         K=[K ones(C,1)/C];
     end
-            
+
+    %optimal attaker utility value
     y1(end+1)=max(sum(U'.*qq));
+    %fair attacker utility value
     y2(end+1)=max(sum(U'.*K));
-    % %optimal utility value
+    
+    % optimal defender utility value
     y3(end+1)=min(sum(U.*pp));
+    
     % %fair-based utility value
     % % y2=max(U*((1/C)*ones(C,1).*q(2:end)));
     % %y1=max(U*(p(2:end).*ones(C,1).*q(2:end)));
+    
+    % fair defender utility value
     y4(end+1)=min(sum(U.*K));
     
 end
