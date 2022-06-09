@@ -22,7 +22,7 @@ for C=[100 200 300 400 500]
     end
     
     %Optimization problem (system)
-    f=[1 zeros(1,C)];
+    f=[-1 zeros(1,C)];
     lb=[-1000; zeros(C,1)];
     ub=[1000; ones(C,1)];
     Aeq=[0 ones(1,C)];
@@ -30,7 +30,7 @@ for C=[100 200 300 400 500]
     A=[ones(C,1) -1*U'];
     b=zeros(1,C);
     tic
-    [p,P] = linprog(-1*f, A, b, Aeq, beq, lb, ub);
+    [p,P] = linprog(f, A, b, Aeq, beq, lb, ub);
     time(end+1)=toc;
     
     %Optimization problem (attacker)
