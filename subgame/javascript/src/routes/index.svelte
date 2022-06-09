@@ -1,12 +1,14 @@
 <script lang="ts">
 	import ValueBoard from '../components/ValueBoard.svelte';
 	import MatchBoard from '../components/MatchBoard.svelte';
-	import Board from '../components/Board.svelte';
+	import BoardComponent from '../components/Board.svelte';
 	import Stats from '../components/Stats.svelte';
+	import Importer from '../components/Importer.svelte';
 	import Controls from '../components/Controls.svelte';
 	import { generateBoard, type BoardOptions } from '../lib/board';
-	import type { Action, Player } from 'src/app';
+	import type { Action, Player, Board } from 'src/app';
 	import { evaluateStrategies, strategies } from '$lib/solver';
+	
 
 	let attackerMaxCost = 10;
 	let defenderMaxCost = 10;
@@ -55,13 +57,22 @@
 		board = generateBoard(boardOptions);
 	}
 
+	function setBoard(b: Board) {
+		board = b;
+		attacking.clear();
+		defending.clear();
+	}
+
 	let iterations = 100;
 	$: results = evaluateStrategies(iterations, boardOptions, attackerCapacity, defenderCapacity);
 </script>
 
 <div style="display:flex">
 	<div style="margin: 5px;">
-		<Board {board} {attacking} {defending} on:toggle={toggle} />
+		<BoardComponent {board} {attacking} {defending} on:toggle={toggle} />
+		<div style="margin:5px;">
+			<Importer {setBoard}/>
+		</div>
 	</div>
 	<div style="margin:5px;">
 		<div>
