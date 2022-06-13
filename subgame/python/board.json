@@ -1,9 +1,6 @@
 [
     {
-        "attack": {
-            "comp": 0,
-            "vuln": 0
-        },
+        "id": 1,
         "attackerCost": 4,
         "defenderCost": 4,
         "attackerProb": 0.79,
@@ -12,10 +9,7 @@
         "risk": 8.82
     },
     {
-        "attack": {
-            "comp": 0,
-            "vuln": 1
-        },
+        "id": 2,
         "attackerCost": 1,
         "defenderCost": 3,
         "attackerProb": 0.82,
@@ -24,10 +18,7 @@
         "risk": 1.18
     },
     {
-        "attack": {
-            "comp": 0,
-            "vuln": 2
-        },
+        "id": 3,
         "attackerCost": 5,
         "defenderCost": 5,
         "attackerProb": 0.5,
@@ -36,10 +27,7 @@
         "risk": 1.84
     },
     {
-        "attack": {
-            "comp": 0,
-            "vuln": 2
-        },
+        "id": 4,
         "attackerCost": 5,
         "defenderCost": 5,
         "attackerProb": 0.6,
