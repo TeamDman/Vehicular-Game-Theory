@@ -52,14 +52,14 @@ class Evaluator:
             attacker=self.attacker
         )
         for i in range(self.num_rounds):
-            self.stats.defender_utils.append(game.defender_agent.utility)
-            self.stats.attacker_utils.append(game.attacker_agent.utility)
-            self.stats.compromise_partial_pcts.append(len([v for v in game.vehicles if len(v.compromises) > 0])/(len(game.vehicles) if len(game.vehicles) > 0 else 1))
-            bot = sum([len(v.achoice) for v in game.vehicles])
+            self.stats.defender_utils.append(game.state.defender_utility)
+            self.stats.attacker_utils.append(game.state.attacker_utility)
+            self.stats.compromise_partial_pcts.append(len([v for v in game.state.vehicles if len(v.compromises) > 0])/(len(game.state.vehicles) if len(game.state.vehicles) > 0 else 1))
+            bot = sum([len(v.attacker_choices) for v in game.state.vehicles])
             if bot == 0: bot = 1
-            self.stats.compromise_overall_pcts.append(sum([len(v.compromises) for v in game.vehicles]) / bot)
-            self.stats.vehicle_lens.append(len(game.vehicles))
-            self.stats.platoon_lens.append(len([v for v in game.vehicles if v.in_platoon]))
+            self.stats.compromise_overall_pcts.append(sum([len(v.compromises) for v in game.state.vehicles]) / bot)
+            self.stats.vehicle_lens.append(len(game.state.vehicles))
+            self.stats.platoon_lens.append(len([v for v in game.state.vehicles if v.in_platoon]))
             game.step()
 
     def plot(self):
