@@ -5,11 +5,12 @@
 import logging
 import sys
 
-level = logging.WARN
-# level = logging.DEBUG
-# enabling debug logging causes lag.
+# level = logging.WARN
+level = logging.DEBUG
 
-handler = logging.StreamHandler(sys.stdout)
+# handler = logging.StreamHandler(sys.stdout)
+# enabling debug logging causes lag using streamhandler
+handler = logging.FileHandler("./logs.log")
 handler.setLevel(level)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
