@@ -1,11 +1,11 @@
 from __future__ import annotations
 import logging
 import random
-from typing import List, Set, Union, FrozenSet, TYPE_CHECKING
+from typing import Deque, List, Set, Union, FrozenSet, TYPE_CHECKING
 from utils import get_logger
 from vehicles import CompromiseState, Vehicle
 from pprint import pprint
-
+from collections import deque
 from dataclasses import dataclass, replace
 
 if TYPE_CHECKING:
@@ -31,7 +31,6 @@ class Agent:
     logger: logging.Logger
 
     def __init__(self, logger: logging.Logger) -> None:
-        self.utility = 0
         self.logger = logger
 
     def get_action(self, state: State) -> Action:
@@ -44,27 +43,40 @@ class Agent:
         pass
 
 # Very simple agent for defender
+class PassiveAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(get_logger("PassiveAgent"))
 
+    def get_action(self, state: State) -> Action:
+        return None
+
+    def take_action(self, state: State, action: Action) -> State:
+        return state
+
+    def get_utility(self, state: State) -> int:
+        return 0
 
 class BasicDefenderAgent(Agent):
     num_vehicles_monitoring_constraint: int
-    recently_monitored: List[Vehicle]
+    recently_monitored: Deque[Vehicle]
     tolerance_threshold: int
-    max_history: int
-    max_size: int
+    # max_size: int
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        monitor_limit: int = 1,
+        tolerance_threshold: int = 3
+    ) -> None:
         super().__init__(get_logger("BasicDefenderAgent"))
-        self.recently_monitored = []
-        self.tolerance_threshold = 3
-        self.max_history = 3
-        self.max_size = 10
+        self.recently_monitored = deque([], maxlen=3)
+        self.tolerance_threshold = tolerance_threshold
+        # self.max_size = 10
+        self.monitor_limit = monitor_limit
 
     def get_utility(self, state: State) -> None:
-        members = len([vehicle for vehicle in state.vehicles if vehicle.in_platoon])
-        compromises = - \
-            sum([vuln.severity for vehicle in state.vehicles for vuln in vehicle.vulnerabilities if vehicle.in_platoon])
-        return members * 10 + compromises
+        members = [vehicle for vehicle in state.vehicles if vehicle.in_platoon]
+        compromises = sum([vuln.severity for vehicle in members for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED])
+        return len(members) * 10 - compromises ** 2
 
     def take_action(self, state: State, action: DefenderAction) -> State:
         # create mutable copy
@@ -86,10 +98,10 @@ class BasicDefenderAgent(Agent):
             vehicles[i] = vehicle
 
         # join vehicles
-        if i in action.join:
+        for i in action.join:
             vehicle = vehicles[i]
             self.logger.info(f"adding vehicle {i} to platoon")
-            vehicle = replace(vehicle, in_platoon=True)
+            vehicle = replace(vehicle, in_platoon = True)
             vehicles[i] = vehicle
 
         # sanity check
@@ -113,20 +125,20 @@ class BasicDefenderAgent(Agent):
         # pick next vehicle to monitor
         choices = [
             i for i,v in enumerate(state.vehicles)
-            if v not in self.recently_monitored
+            # if v not in self.recently_monitored
+            # todo: investigate ways of preventing picking same vehicle without using vehicle IDs
         ]
+        random.shuffle(choices)
         monitor = set()
         if len(choices) == 0:
             self.logger.warn("no candidates found to monitor?")
             pprint(state.vehicles)
             pprint(self.recently_monitored)
         else:
-            monitor.add(random.choice(choices))
-            # avoid monitoring the last 3 vehicles again
-            if len(self.recently_monitored) >= self.max_history:
-                self.recently_monitored.pop(0)
-            for vehicle in monitor:
-                self.recently_monitored.append(vehicle)
+            while len(monitor) < self.monitor_limit and len(choices) > 0:
+                x = choices.pop()
+                monitor.add(x)
+                self.recently_monitored.append(x)
 
         # kick risky vehicles from platoon
         kick = set()
@@ -138,15 +150,17 @@ class BasicDefenderAgent(Agent):
 
         # join low risk vehicles into the platoon
         join = set()
-        member_count = len([1 for v in state.vehicles if v.in_platoon])
+        # member_count = len([1 for v in state.vehicles if v.in_platoon])
         candidates = [
             i for i,vehicle in enumerate(state.vehicles)
-            if vehicle.risk <= 10
+            if not vehicle.in_platoon
+            and vehicle.risk <= 10
             and sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]) <= self.tolerance_threshold
-            and member_count < self.max_size
+            # and member_count < self.max_size
         ]
         random.shuffle(candidates)
-        while member_count + len(join) < self.max_size and len(candidates) > 0:
+        while len(candidates) > 0:
+        # while member_count + len(join) < self.max_size and len(candidates) > 0:
             # take while there's room in the platoon
             join.add(candidates.pop())
 
@@ -162,7 +176,7 @@ class BasicDefenderAgent(Agent):
 class BasicAttackerAgent(Agent):
     def __init__(self) -> None:
         super().__init__(get_logger("BasicAttackerAgent"))
-        self.attack_limit = 2
+        self.attack_limit = 1
 
     def get_utility(self, state: State) -> None:
         util = 0
