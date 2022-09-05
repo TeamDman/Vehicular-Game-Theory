@@ -144,7 +144,7 @@ class BasicDefenderAgent(Agent):
         kick = set()
         for i,vehicle in enumerate(state.vehicles):
             if not vehicle.in_platoon: continue
-            total = sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED])
+            total = sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN])
             if total > self.tolerance_threshold:
                 kick.add(i)
 
@@ -155,7 +155,7 @@ class BasicDefenderAgent(Agent):
             i for i,vehicle in enumerate(state.vehicles)
             if not vehicle.in_platoon
             and vehicle.risk <= 10
-            and sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]) <= self.tolerance_threshold
+            and sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]) <= self.tolerance_threshold
             # and member_count < self.max_size
         ]
         random.shuffle(candidates)
