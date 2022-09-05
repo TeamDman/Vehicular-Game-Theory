@@ -4,6 +4,8 @@ import random
 from typing import Set, Dict, List, Tuple, Optional, FrozenSet
 from utils import get_logger
 from enum import Enum
+import torch
+
 class CompromiseState(Enum):
     NOT_COMPROMISED = 1
     COMPROMISED_UNKNOWN = 2
@@ -15,6 +17,15 @@ class Vulnerability:
     prob: float
     severity: int
     state: CompromiseState = CompromiseState.NOT_COMPROMISED
+
+    def as_tensor(self) -> torch.Tensor:
+        return torch.tensor([
+            self.prob,
+            self.severity,
+            # split compromised/known state apart to help model learn
+            0 if self.state == CompromiseState.NOT_COMPROMISED else 0, 
+            1 if self.state == CompromiseState.COMPROMISED_KNOWN else 0
+        ])
 
 
 @dataclass(frozen=True)
@@ -28,6 +39,12 @@ class Vehicle:
 
     def __repr__(self) -> str:
         return self.__str__()
+    
+    def as_tensor(self) -> torch.Tensor:
+        return torch.tensor([
+            1 if self.in_platoon else 0,
+            self.risk
+        ])
 
 class VehicleProvider:
     max_vulns: int

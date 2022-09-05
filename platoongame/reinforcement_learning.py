@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from collections import namedtuple, deque
 from itertools import count
 from PIL import Image
+import vehicles
 
 import torch
 import torch.nn as nn
@@ -46,16 +47,16 @@ class AttackerDQN(nn.Module):
             2d conv
             vehicles x vulns
             features:
-            - attackerCost
-            - defenderCost
-            - attackerProb
-            - defenderPRob
+            - prob
             - severity
             - is_compromised
             - is_compromise_known
         """
+        self.vuln_width = vehicles.Vulnerability(0,0).as_tensor().shape[0]
+        self.max_vulns = game.vehicle_provider.max_vulns
+        self.max_vehicles = game.config.max_vehicles
         self.vuln_conv = nn.Conv2d(
-            in_channels = 7,
+            in_channels=self.vuln_width,
             out_channels=8,
             kernel_size=5,
             stride=2
@@ -69,38 +70,33 @@ class AttackerDQN(nn.Module):
         - risk
         - in_platoon
         """
-        self.vec_conv = nn.Conv1d(
+        self.vehicle_conv = nn.Conv1d(
             in_channels = 2,
             out_channels = 4,
             kernel_size=2,
             stride=1
         )
-        self.vec_norm = nn.BatchNorm1d(self.vec_conv.out_channels)
+        self.vehicle_norm = nn.BatchNorm1d(self.vehicle_conv.out_channels)
 
-        # self.head = nn.Linear()
-        # self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
-        # self.bn1 = nn.BatchNorm2d(16)
-        # self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
-        # self.bn2 = nn.BatchNorm2d(32)
-        # self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
-        # self.bn3 = nn.BatchNorm2d(32)
-        # # Number of Linear input connections depends on output of conv2d layers
-        # # and therefore the input image size, so compute it.
-        # def conv2d_size_out(size, kernel_size = 5, stride = 2):
-        #     return (size - (kernel_size - 1) - 1) // stride  + 1
-        # convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
-        # convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
-        # linear_input_size = convw * convh * 32
-        # self.head = nn.Linear(linear_input_size, outputs)
+        self.head = nn.Linear(
+            in_features = 144+108,
+            out_features = self.max_vehicles
+        )
+    
+    def forward(
+        self,
+        x_vulns: torch.Tensor, # (BatchSize, Vehicle, Vuln, VulnFeature)
+        x_vehicle: torch.Tensor, # (BatchSize, Vehicle, VehicleFeature)
+    ):
+        x_a = F.relu(self.vuln_conv(x_vulns.permute((0,3,1,2))))
+        x_a = F.relu(self.vuln_norm(x_a))
 
-    # Called with either one element to determine next action, or a batch
-    # during optimization. Returns tensor([[left0exp,right0exp]...]).
-    def forward(self, x):
-        pass
-        # x = F.relu(self.bn1(self.conv1(x)))
-        # x = F.relu(self.bn2(self.conv2(x)))
-        # x = F.relu(self.bn3(self.conv3(x)))
-        # return self.head(x.view(x.size(0), -1))
+        x_b = F.relu(self.vehicle_conv(x_vehicle.permute(0,2,1)))
+        x_b = F.relu(self.vehicle_norm(x_b))
+
+        x = torch.cat((x_a.flatten(), x_b.flatten()))
+        x = F.sigmoid(self.head(x))
+        return x
 
 class RLAttackerAgent(BasicAttackerAgent):
     def __init__(self, game: Game) -> None:
