@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import gym
 import math
 import random
@@ -127,18 +128,23 @@ class RLAttackerAgent(BasicAttackerAgent):
 RLAgent = RLAttackerAgent
 # RLAgent = Union[RLAttackerAgent, RLDefenderAgent]
 
+@dataclass
+class AttackerTrainer:
+    batch_size:int = 128
+    gamma:float = 0.999
+    eps_start:float = 0.9
+    eps_end:float = 0.05
+    eps_decay:float = 200
+    target_update:int = 10
+    steps_done:int = 0
 
-class Trainer:
-    def __init__(self) -> None:
-        self.batch_size = 128
-        self.gamma = 0.999
-        self.eps_start = 0.9
-        self.eps_end = 0.05
-        self.eps_decay = 200
-        self.target_update = 10
+    def reset(self):
+        self.steps_done = 0
 
-    def optimize(agent: RLAgent):
+    def select_action(self, state: State)
+
+    def optimize(self, agent: RLAgent):
         optimizer = optim.RMSprop(agent.policy_net.parameters())
         memory = ReplayMemory(10000)
-        steps_done = 0
+        
         
