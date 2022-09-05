@@ -28,7 +28,9 @@ class State:
                 
 @dataclass
 class GameConfig:
-    max_vehicles: int
+    max_vehicles: int = 10
+    cycle_every: int = None
+    cycle_num: int = None
 
 class Game:
     state: State
@@ -69,7 +71,7 @@ class Game:
             self.logger.debug(f"defender turn end")
         
         # if self.step_count % 3 == 0 and len(self.vehicles) < self.config.max_vehicles:
-        if self.step_count % 3 == 0:
+        if self.config.cycle_every is not None and self.step_count % self.config.cycle_every == 0:
             self.logger.info("cycling out vehicles")
             cycle = 2
             remove = set()
