@@ -31,6 +31,7 @@ class GameConfig:
     max_vehicles: int = 10
     cycle_every: int = None
     cycle_num: int = None
+    cycle_allow_platoon: bool = False
 
 class Game:
     state: State
@@ -72,12 +73,11 @@ class Game:
         
         # if self.step_count % 3 == 0 and len(self.vehicles) < self.config.max_vehicles:
         if self.config.cycle_every is not None and self.step_count % self.config.cycle_every == 0:
-            self.logger.info("cycling out vehicles")
-            cycle = 2
             remove = set()
-            candidates = list([(i,v) for i,v in enumerate(self.state.vehicles) if not v.in_platoon])
+            candidates = list([(i,v) for i,v in enumerate(self.state.vehicles) if not v.in_platoon or self.config.cycle_allow_platoon])
+            self.logger.info(f"cycling out {len(candidates)} of {self.config.cycle_num} allowed vehicles")
             random.shuffle(candidates)
-            while len(remove) < cycle and len(candidates) > 0:
+            while len(remove) < self.config.cycle_num and len(candidates) > 0:
                 i,v = candidates.pop()
                 self.logger.info(f"Vehicle {i} risk {v.risk} has left the game.")
                 remove.add(i)

@@ -76,7 +76,9 @@ class BasicDefenderAgent(Agent):
     def get_utility(self, state: State) -> None:
         members = [vehicle for vehicle in state.vehicles if vehicle.in_platoon]
         compromises = sum([vuln.severity for vehicle in members for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED])
-        return len(members) * 10 - compromises ** 2
+        # return len(members) * 10 - compromises ** 2
+        # return int(len(members) * 10 - compromises ** 1.5)
+        return int(len(members) * 1 - compromises)
 
     def take_action(self, state: State, action: DefenderAction) -> State:
         # create mutable copy
@@ -174,9 +176,9 @@ class BasicDefenderAgent(Agent):
 
 
 class BasicAttackerAgent(Agent):
-    def __init__(self) -> None:
+    def __init__(self, attack_limit:int = 1) -> None:
         super().__init__(get_logger("BasicAttackerAgent"))
-        self.attack_limit = 1
+        self.attack_limit = attack_limit
 
     def get_utility(self, state: State) -> None:
         util = 0
