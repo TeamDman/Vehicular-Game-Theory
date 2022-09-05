@@ -3,35 +3,34 @@ import json
 import random
 from typing import Set, Dict, List, Tuple, Optional, FrozenSet
 from utils import get_logger
+from enum import Enum
+class CompromiseState(Enum):
+    NOT_COMPROMISED = 1
+    COMPROMISED_UNKNOWN = 2
+    COMPROMISED_KNOWN = 3
 
 
 @dataclass(frozen=True)
 class Vulnerability:
-    id: int
-    attackerCost: int
-    defenderCost: int
-    attackerProb: float
-    defenderProb: float
+    prob: float
     severity: int
+    state: CompromiseState = CompromiseState.NOT_COMPROMISED
 
 
 @dataclass(frozen=True)
 class Vehicle:
-    id: int
     risk: float
-    defender_choices: FrozenSet[Vulnerability]
-    attacker_choices: FrozenSet[Vulnerability]
+    vulnerabilities: Tuple[Vulnerability, ...]
     in_platoon: bool = False
-    compromises: FrozenSet[Vulnerability] = field(default_factory=frozenset)
-    known_compromises: FrozenSet[Vulnerability] = field(default_factory=frozenset)
 
     def __str__(self) -> str:
-        return f"Vehicle(risk={self.risk}, in_platoon={self.in_platoon}, compromises={self.compromises}, known_compromises={self.known_compromises}, defender_choices={self.defender_choices}, attacker_choices={self.attacker_choices})"
+        return f"Vehicle(risk={self.risk}, in_platoon={self.in_platoon}, vulnerabilities={self.vulnerabilities})"
 
     def __repr__(self) -> str:
         return self.__str__()
 
 class VehicleProvider:
+    max_vulns: int
     def next(self) -> Vehicle:
         pass
 
@@ -54,19 +53,27 @@ class JsonVehicleProvider(VehicleProvider):
 
         # convert json to vehicle classes
         self.vehicles = []
-        id = 0
+        for vehicle in loaded:
+            vulns = []
+            for vuln in vehicle["achoice"]:
+                prob = vuln["attackerProb"]
+                for other in vehicle["dchoice"]:
+                    if other["id"] == vuln["id"]:
+                        prob *= 1-other["defenderProb"]
+                vulns.append(Vulnerability(
+                    prob=prob,
+                    severity=vuln["severity"],
+                ))
 
-        def get_vuln(v):
-            return Vulnerability(v["id"], v["attackerCost"], v["defenderCost"], v["attackerProb"], v["defenderProb"], v["severity"])
-        for v in loaded:
-            v = Vehicle(
-                id=id,
-                risk=-1 * v["defender_util"],
-                defender_choices=frozenset([get_vuln(v) for v in v["dchoice"]]),
-                attacker_choices=frozenset([get_vuln(v) for v in v["achoice"]]),
+            vehicle = Vehicle(
+                risk=-1 * vehicle["defender_util"],
+                vulnerabilities=tuple(vulns)
             )
-            self.vehicles.append(v)
-            id += 1
+            self.vehicles.append(vehicle)
+
+        ids = set()
+
+        self.max_vulns = max([len(v.vulnerabilities) for v in self.vehicles])
 
     def next(self) -> Vehicle:
         # candidates = [v for v in self.vehicles if v not in self.seen]

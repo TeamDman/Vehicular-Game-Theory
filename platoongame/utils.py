@@ -35,3 +35,13 @@ class NoneRefersDefault:
             # If there is a default and the value of the field is none we can assign a value
             if not isinstance(field.default, _MISSING_TYPE) and getattr(self, field.name) is None:
                 setattr(self, field.name, field.default)
+                
+
+##################
+# TORCH
+##################
+def get_device():
+    import torch
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+            
