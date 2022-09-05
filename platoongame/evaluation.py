@@ -30,15 +30,18 @@ class Evaluator:
             vehicle_provider=self.vehicles
         )
         for i in range(self.num_rounds):
-            m = Metrics(
+            self.stats.append(Metrics(
                 defender_util=game.state.defender_utility,
                 attacker_util=game.state.attacker_utility,
                 compromises=len([1 for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
                 known_compromises=len([vuln for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
                 platoon_size=len([1 for v in game.state.vehicles if v.in_platoon]),
                 vehicles=len(game.state.vehicles),
+            ))
+            game.step(
+                attacker_agent=self.attacker,
+                defender_agent=self.defender,
             )
-            self.stats.append(m)
             game.step(
                 attacker_agent=self.attacker,
                 defender_agent=self.defender,
@@ -56,15 +59,15 @@ class Evaluator:
         axs[i].title.set_text("accumulated utilities")
 
         i+=1
-        axs[i].plot(np.diff([x.defender_util for x in self.stats]), label="defender", alpha=0.5)
-        axs[i].plot(np.diff([x.attacker_util for x in self.stats]), label="attacker", alpha=0.5)
+        axs[i].plot(np.diff([x.defender_util for x in self.stats]), label="defender", alpha=1)
+        axs[i].plot(np.diff([x.attacker_util for x in self.stats]), label="attacker", alpha=1)
         axs[i].legend(loc="upper left")
         axs[i].title.set_text("utility deltas")
 
         i+=1
-        axs[i].plot([x.compromises for x in self.stats], label="compromises", alpha=0.5)
+        axs[i].plot([x.compromises for x in self.stats], label="compromises", alpha=1)
         axs[i].plot([x.known_compromises for x in self.stats], label="known compromises", alpha=1)
-        axs[i].set_yticks(np.arange(0,1,0.1))
+        # axs[i].set_yticks(np.arange(0,1,0.1))
         axs[i].title.set_text("compromises")
         axs[i].legend(loc="upper left")
 
