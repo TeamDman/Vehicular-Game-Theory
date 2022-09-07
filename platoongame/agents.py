@@ -79,6 +79,7 @@ class BasicDefenderAgent(Agent):
         # return len(members) * 10 - compromises ** 2
         # return int(len(members) * 10 - compromises ** 1.5)
         return int(len(members) * 1 - compromises)
+        # return int(len(members) * 1 - compromises)
 
     def take_action(self, state: State, action: DefenderAction) -> State:
         # create mutable copy
@@ -186,10 +187,10 @@ class BasicAttackerAgent(Agent):
             for vuln in vehicle.vulnerabilities:
                 if vuln.state == CompromiseState.NOT_COMPROMISED: continue
                 if vehicle.in_platoon:
-                    util += vuln.severity * 2
-                else:
                     util += vuln.severity
-        return util
+                else:
+                    util += vuln.severity / 4
+        return int(util)
 
     def take_action(self, state: State, action: AttackerAction) -> State:
         vehicles = list(state.vehicles)

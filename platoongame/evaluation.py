@@ -26,33 +26,38 @@ class Evaluator:
     vehicles: VehicleProvider
     stats: List[Metrics] = field(default_factory=list)
 
-    def run(self):
+    def reset(self):
         self.stats = []
-        game = Game(
+        self.game = Game(
             config=self.game_config,
             vehicle_provider=self.vehicles
         )
-        self.game = game # for investigating later
+
+    def run(self):
+        self.reset()
+        self.track_stats()
         for i in range(self.num_rounds):
-            self.stats.append(Metrics(
-                defender_util=game.state.defender_utility,
-                attacker_util=game.state.attacker_utility,
-                compromises=len([1 for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
-                known_compromises=len([vuln for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
-                compromised_overall=len([1 for vehicle in game.state.vehicles if all([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
-                compromised_partial=len([1 for vehicle in game.state.vehicles if any([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
-                platoon_severity = sum([vuln.severity for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vehicle.in_platoon and vuln.state != CompromiseState.NOT_COMPROMISED]),
-                platoon_size=len([1 for v in game.state.vehicles if v.in_platoon]),
-                vehicles=len(game.state.vehicles),
-            ))
-            game.step(
-                attacker_agent=self.attacker,
-                defender_agent=self.defender,
-            )
-            game.step(
-                attacker_agent=self.attacker,
-                defender_agent=self.defender,
-            )
+            self.step()
+    
+    def step(self):
+        self.game.step(
+            attacker_agent=self.attacker,
+            defender_agent=self.defender,
+        )
+        self.track_stats()
+
+    def track_stats(self) -> None:
+        self.stats.append(Metrics(
+            defender_util=self.game.state.defender_utility,
+            attacker_util=self.game.state.attacker_utility,
+            compromises=len([1 for vehicle in self.game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
+            known_compromises=len([vuln for vehicle in self.game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
+            compromised_overall=len([1 for vehicle in self.game.state.vehicles if all([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
+            compromised_partial=len([1 for vehicle in self.game.state.vehicles if any([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
+            platoon_severity = sum([vuln.severity for vehicle in self.game.state.vehicles for vuln in vehicle.vulnerabilities if vehicle.in_platoon and vuln.state != CompromiseState.NOT_COMPROMISED]),
+            platoon_size=len([1 for v in self.game.state.vehicles if v.in_platoon]),
+            vehicles=len(self.game.state.vehicles),
+        ))
 
     def plot(self):
         import matplotlib.pyplot as plt
@@ -75,7 +80,7 @@ class Evaluator:
         i+=1
         axs[i].plot([x.platoon_severity for x in self.stats], label="severity", alpha=1)
         axs[i].legend(loc="upper left")
-        axs[i].title.set_text("accumulated severity")
+        axs[i].title.set_text("platoon severity")
 
         i+=1
         axs[i].plot([x.compromises for x in self.stats], label="compromises", alpha=0.9)

@@ -1,5 +1,6 @@
 from __future__ import annotations 
 from dataclasses import dataclass, replace
+from re import S
 from typing import FrozenSet, List, Tuple, Literal, TYPE_CHECKING
 from utils import get_logger
 from vehicles import Vehicle, VehicleProvider
@@ -59,18 +60,21 @@ class Game:
         defender_agent: Agent
     ) -> None:
         self.logger.debug("stepping")
-        self.turn = "defender" if self.turn == "attacker" else "attacker"
-        if self.turn == "attacker":
-            self.logger.debug(f"attacker turn begin")
-            action = attacker_agent.get_action(self.state)
-            self.state = attacker_agent.take_action(self.state, action)
-            self.logger.debug(f"attacker turn end")
-        if self.turn == "defender":
-            self.logger.debug(f"defender turn begin")
-            action = defender_agent.get_action(self.state)
-            self.state = defender_agent.take_action(self.state, action)
-            self.logger.debug(f"defender turn end")
+        self.logger.debug(f"attacker turn begin")
+        action = attacker_agent.get_action(self.state)
+        self.state = attacker_agent.take_action(self.state, action)
+        self.logger.debug(f"attacker turn end")
         
+        self.logger.debug(f"defender turn begin")
+        action = defender_agent.get_action(self.state)
+        self.state = defender_agent.take_action(self.state, action)
+        self.logger.debug(f"defender turn end")
+        
+        self.cycle()
+
+        self.step_count += 1
+
+    def cycle(self) -> None:
         # if self.step_count % 3 == 0 and len(self.vehicles) < self.config.max_vehicles:
         if self.config.cycle_every is not None and self.step_count % self.config.cycle_every == 0:
             remove = set()
@@ -87,4 +91,3 @@ class Game:
                 self.logger.info(f"Vehicle with risk {new.risk} has joined the game!")
                 vehicles.append(new)
             self.state = replace(self.state, vehicles=tuple(vehicles))
-        self.step_count += 1
