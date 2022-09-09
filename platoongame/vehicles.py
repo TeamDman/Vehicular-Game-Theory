@@ -14,8 +14,8 @@ class CompromiseState(Enum):
 
 @dataclass(frozen=True)
 class Vulnerability:
-    prob: float
-    severity: int
+    prob: float = 0
+    severity: int = 0
     state: CompromiseState = CompromiseState.NOT_COMPROMISED
 
     def as_tensor(self) -> torch.Tensor:
@@ -30,8 +30,8 @@ class Vulnerability:
 
 @dataclass(frozen=True)
 class Vehicle:
-    risk: float
-    vulnerabilities: Tuple[Vulnerability, ...]
+    risk: float = 0
+    vulnerabilities: Tuple[Vulnerability, ...] = field(default_factory=tuple)
     in_platoon: bool = False
 
     def __str__(self) -> str:

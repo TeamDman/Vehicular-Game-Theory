@@ -11,6 +11,8 @@ import vehicles
 
 if TYPE_CHECKING:
     from agents import Agent
+    from reinforcement_learning import ShapeData
+
 
 @dataclass(frozen=True)
 class State:
@@ -18,9 +20,9 @@ class State:
     defender_utility: int = 0
     attacker_utility: int = 0
 
-    def as_tensors(self, max_vehicles: int, max_vulns: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        vulns_quant = torch.zeros((max_vehicles, max_vulns, vehicles.Vulnerability(0,0).as_tensor().shape[0]))
-        vehicles_quant = torch.zeros((max_vehicles, vehicles.Vehicle(0,0).as_tensor().shape[0]))
+    def as_tensors(self, shape_data: ShapeData) -> Tuple[torch.Tensor, torch.Tensor]:
+        vulns_quant = torch.zeros((shape_data.num_vehicles, shape_data.num_vulns, vehicles.Vulnerability(0,0).as_tensor().shape[0]))
+        vehicles_quant = torch.zeros((shape_data.num_vehicles, vehicles.Vehicle(0,0).as_tensor().shape[0]))
         for i, vehicle in enumerate(self.vehicles):
             vehicles_quant[i] = vehicle.as_tensor()
             for j, vuln in enumerate(vehicle.vulnerabilities):

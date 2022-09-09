@@ -23,14 +23,14 @@ class Evaluator:
     defender: Agent
     num_rounds: int
     game_config: GameConfig
-    vehicles: VehicleProvider
+    vehicle_provider: VehicleProvider
     stats: List[Metrics] = field(default_factory=list)
 
     def reset(self):
         self.stats = []
         self.game = Game(
             config=self.game_config,
-            vehicle_provider=self.vehicles
+            vehicle_provider=self.vehicle_provider
         )
 
     def run(self):
@@ -59,7 +59,8 @@ class Evaluator:
             vehicles=len(self.game.state.vehicles),
         ))
 
-    def plot(self):
+    def plot(self, stats: List[Metrics] = None):
+        if stats is None: stats = self.stats
         import matplotlib.pyplot as plt
         import numpy as np
         # fig, axs = plt.subplots(4, figsize=(16,9), gridspec_kw={'height_ratios': [1, 2, 1, 1]})
