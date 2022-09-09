@@ -146,6 +146,7 @@ class DefenderDQN(nn.Module):
             - is_compromised
             - is_compromise_known
         """
+        self.shape_data = shape_data
         self.vuln_conv = nn.LazyConv2d(
             out_channels=8,
             kernel_size=5,
@@ -181,76 +182,53 @@ class DefenderDQN(nn.Module):
     
     def forward(
         self,
-        quant: Tuple[torch.Tensor,...]
-    ):
-        x_vulns = quant[0] # (BatchSize, Vehicle, Vuln, VulnFeature)
-        x_vehicle = quant[1] # (BatchSize, Vehicle, VehicleFeature)
-        is_batch = len(x_vulns.shape) > 3
-        if not is_batch:
-            x_vulns = x_vulns.unsqueeze(dim=0)
-            x_vehicle = x_vehicle.unsqueeze(dim=0)
-
-        print(x_vulns.shape, "x_vulns")
+        x_vulns: torch.Tensor,  # (BatchSize, Vehicle, Vuln, VulnFeature)
+        x_vehicles: torch.Tensor,# (BatchSize, Vehicle, VehicleFeature)
+    ) -> Tuple[torch.Tensor, ...]:
+        # print(x_vulns.shape, "x_vulns")
         x_a = F.relu(self.vuln_conv(x_vulns.permute((0,3,1,2))))
-        print(x_a.shape, "x_a after conv")
+        # print(x_a.shape, "x_a after conv")
         x_a = F.relu(self.vuln_norm(x_a))
-        print(x_a.shape, "x_a after norm")
+        # print(x_a.shape, "x_a after norm")
 
-        print(x_vehicle.shape, "x_vehicle")
-        x_b = F.relu(self.vehicle_conv(x_vehicle.permute(0,2,1)))
-        print(x_b.shape, "x_b after conv")
+        # print(x_vehicles.shape, "x_vehicle")
+        x_b = F.relu(self.vehicle_conv(x_vehicles.permute(0,2,1)))
+        # print(x_b.shape, "x_b after conv")
         x_b = F.relu(self.vehicle_norm(x_b))
-        print(x_b.shape, "x_b after norm")
+        # print(x_b.shape, "x_b after norm")
 
-        print(x_a.shape, x_b.shape, "x_a, x_b")
+        # print(x_a.shape, x_b.shape, "x_a, x_b")
 
-        x = torch.cat((x_a.flatten(start_dim=1), x_b.flatten(start_dim=1)))
-        print(x.shape, "flat")
+        x = torch.cat((x_a.flatten(start_dim=1), x_b.flatten(start_dim=1)), dim=1)
+        # print(x.shape, "flat")
 
         members = torch.arctan(self.member_head(x))
-        print(members.shape, "member")
+        # print(members.shape, "member")
         monitor = torch.arctan(self.monitor_head(x))
-        print(monitor.shape, "monitor")
+        # print(monitor.shape, "monitor")
+
         return members, monitor
 
+    def quantify_state_batch(self, states: List[State]) -> Tuple[torch.Tensor,...]:
+        # list of state tensor tuples
+        x: List[Tuple[torch.Tensor, torch.Tensor]] = [s.as_tensors(self.shape_data) for s in states]
 
-class RLDefenderAgent(BasicDefenderAgent):
-    def __init__(self, monitor_limit: int, shape_data: ShapeData) -> None:
-        super().__init__(
-            monitor_limit=monitor_limit
-        )
-        self.logger = get_logger("RLDefenderAgent")
-        device = get_device()
-        self.shape_data = shape_data
-        self.policy_net = DefenderDQN(shape_data).to(device)
-        self.target_net = DefenderDQN(shape_data).to(device)
-        self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.target_net.eval()
+        # list of tuples => tuple of lists
+        # https://stackoverflow.com/a/51991395/11141271
+        x: Tuple[List[torch.Tensor], List[torch.Tensor]] = tuple(map(list,zip(*x)))
 
+        # stack in new dim
+        x_vulns = torch.stack(x[0])
+        x_vehicles = torch.stack(x[1])
+        return x_vulns, x_vehicles
 
-    def take_action(self, state: State, action: DefenderAction) -> State:
-        return BasicDefenderAgent.take_action(self, state, action)
-    
-    def get_action(self, state: State) -> DefenderAction:
-        with torch.no_grad():
-            action_quant = self.policy_net(self.quantify_state(state))
-            # .max(1)[1].view(1,1)
-        return self.dequantify_action(state, action_quant)
+    def dequantify_state_batch(self, states: List[State], members: torch.Tensor, monitor: torch.Tensor) -> List[DefenderAction]:
+        return [
+            self.dequantify(state, mem, mon)
+            for state, mem, mon in zip(states, members, monitor)
+        ]
 
-    def get_random_action(self, state: State) -> DefenderAction:
-        members = [i for i,v in enumerate(state.vehicles) if v.in_platoon]
-        non_members = [i for i,v in enumerate(state.vehicles) if not v.in_platoon]
-        return DefenderAction(
-            monitor=frozenset(random.sample(members, min(self.monitor_limit, len(members)))),
-            join=frozenset(random.sample(non_members, random.randint(0,len(non_members)))),
-            kick=frozenset(random.sample(members, len(members)))
-        )
-
-    def quantify_state(self, state: State) -> Tuple[torch.Tensor,...]:
-        return state.as_tensors(self.shape_data)
-
-    def dequantify_action(self, state: State, quant: Tuple[torch.Tensor,...]) ->DefenderAction:
-        members, monitor = quant
+    def dequantify(self, state: State, members: torch.Tensor, monitor: torch.Tensor) -> DefenderAction:
         members = members.heaviside(torch.tensor(1.)) # threshold
         members = (members == 1).nonzero().squeeze() # identify indices
         members = frozenset(members.numpy()) # convert to set
@@ -266,6 +244,37 @@ class RLDefenderAgent(BasicDefenderAgent):
             kick = frozenset([x for x in existing_members if x not in members]),
             join = frozenset([x for x in members if x not in existing_members])
         )
+
+    def get_actions(self, states: List[State]) -> List[DefenderAction]:
+        with torch.no_grad():
+            members, monitor = self(*self.quantify_state_batch(states))
+        return self.dequantify_state_batch(states, members, monitor)
+
+class RLDefenderAgent(BasicDefenderAgent):
+    def __init__(self, monitor_limit: int, shape_data: ShapeData) -> None:
+        super().__init__(
+            monitor_limit=monitor_limit
+        )
+        self.logger = get_logger("RLDefenderAgent")
+        device = get_device()
+        self.shape_data = shape_data
+        self.policy_net = DefenderDQN(shape_data).to(device)
+        self.target_net = DefenderDQN(shape_data).to(device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.target_net.eval()
+    
+    def get_action(self, state: State) -> DefenderAction:
+        return self.policy_net.get_actions([state])[0]
+
+    def get_random_action(self, state: State) -> DefenderAction:
+        members = [i for i,v in enumerate(state.vehicles) if v.in_platoon]
+        non_members = [i for i,v in enumerate(state.vehicles) if not v.in_platoon]
+        return DefenderAction(
+            monitor=frozenset(random.sample(members, min(self.monitor_limit, len(members)))),
+            join=frozenset(random.sample(non_members, random.randint(0,len(non_members)))),
+            kick=frozenset(random.sample(members, len(members)))
+        )
+
 
 RLAgent = Union[RLAttackerAgent, RLDefenderAgent]
 
@@ -351,22 +360,51 @@ class DefenderAgentTrainer:
 
     def optimize(self, agent: RLAgent, memory: ReplayMemory) -> None:
         if len(memory) < self.batch_size: return
-        transitions = memory.sample(self.batch_size)
-        # convert from {'state', 'action', 'next_state', 'reward'}[] to {'state'[], 'action'[], 'next_state'[], 'reward'[]})
-        batch = [x.state for x in transitions]
-        batch = [agent.quantify_state(x) for x in batch]
-        batch = list(zip(*batch))
-        x_vulns = torch.cat(batch[0])
-        x_vehicles =  torch.cat(batch[1])
-
         optimizer = optim.RMSprop(agent.policy_net.parameters())
-        print(x_vulns.shape, x_vehicles.shape)
-        y_members, y_monitor = agent.policy_net((x_vulns, x_vehicles))
-        print(y_members.shape, y_monitor.shape)
+
+        # get batch
+        transitions = memory.sample(self.batch_size)
+
+        # extract states from batch
+        states = [x.state for x in transitions]
+
+        # convert states to tensors
+        x_vulns, x_vehicles = agent.policy_net.quantify_state_batch(states)
+
+        # feed tensors to model
+        optimizer = optim.RMSprop(agent.policy_net.parameters())
+        y_members, y_monitor = agent.policy_net(x_vulns, x_vehicles)
+
+        # convert model output tensors to actions
+        actions = agent.policy_net.dequantify_state_batch(states, y_members, y_monitor)
+
+        # compute expected actions using older target_net
+        y_members, y_monitor = agent.target_net(x_vulns, x_vehicles)
+        expected_actions = agent.target_net.dequantify_state_batch(states, y_members, y_monitor)
+
+        # evaluate the action to find the resulting state
+        next_states = [agent.take_action(s, a) for s,a in zip(states, actions)]
+        expected_next_states = [agent.take_action(s, a) for s,a in zip(states, actions)]
+
+        # calculate rewards
+        next_reward = torch.tensor([agent.get_utility(s) for s in next_states], dtype=int)
+        expected_next_reward = torch.tensor([agent.get_utility(s) for s in expected_next_states], dtype=int)
+
+        # calculate loss
+        criterion = nn.SmoothL1Loss()
+        loss = criterion(next_reward, expected_next_reward)
+        print(loss, "loss")
+
+        # optimize
+        optimizer.zero_grad()
+        loss.backward()
+        for param in agent.policy_net.parameters():
+            param.grad.data.clamp_(-1, 1)
+        optimizer.step()
 
 
-        # quant = [agent.quantify_state(x) for x in batch]
-        
+
+
 
     def optimize_old(self, agent: RLAgent, memory: ReplayMemory) -> None:
         if len(memory) < self.batch_size: return

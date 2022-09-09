@@ -73,7 +73,7 @@ class BasicDefenderAgent(Agent):
         # self.max_size = 10
         self.monitor_limit = monitor_limit
 
-    def get_utility(self, state: State) -> None:
+    def get_utility(self, state: State) -> int:
         members = [vehicle for vehicle in state.vehicles if vehicle.in_platoon]
         compromises = sum([vuln.severity for vehicle in members for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED])
         # return len(members) * 10 - compromises ** 2
@@ -181,7 +181,7 @@ class BasicAttackerAgent(Agent):
         super().__init__(get_logger("BasicAttackerAgent"))
         self.attack_limit = attack_limit
 
-    def get_utility(self, state: State) -> None:
+    def get_utility(self, state: State) -> int:
         util = 0
         for vehicle in state.vehicles:
             for vuln in vehicle.vulnerabilities:
