@@ -24,6 +24,7 @@ class AttackerAction:
     attack: FrozenSet[int]
 
 
+
 Action = Union[DefenderAction, AttackerAction]
 
 
@@ -185,10 +186,9 @@ class BasicAttackerAgent(Agent):
         util = 0
         for vehicle in state.vehicles:
             for vuln in vehicle.vulnerabilities:
-                if vuln.state == CompromiseState.NOT_COMPROMISED: continue
-                if vehicle.in_platoon:
+                if vehicle.in_platoon and vuln.state != CompromiseState.NOT_COMPROMISED:
                     util += vuln.severity
-                else:
+                elif not vehicle.in_platoon and vuln.state == CompromiseState.COMPROMISED_UNKNOWN:
                     util += vuln.severity / 4
         return int(util)
 
