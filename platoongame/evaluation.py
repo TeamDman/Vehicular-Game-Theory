@@ -16,6 +16,9 @@ class Metrics:
     platoon_severity: int
     vehicles: int
     platoon_size: int
+# todo: add new metrics
+# - Learning rate
+# - Risk of the platoon
 
 @dataclass
 class Evaluator:

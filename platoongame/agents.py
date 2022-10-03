@@ -7,6 +7,7 @@ from vehicles import CompromiseState, Vehicle
 from pprint import pprint
 from collections import deque
 from dataclasses import dataclass, replace
+from abc import ABC, abstractmethod
 
 if TYPE_CHECKING:
     from game import Game, State
@@ -27,23 +28,28 @@ class AttackerAction:
 
 Action = Union[DefenderAction, AttackerAction]
 
-
-class Agent:
+###############################
+#region Base stuff
+###############################
+class Agent(ABC):
     logger: logging.Logger
 
     def __init__(self, logger: logging.Logger) -> None:
         self.logger = logger
 
+    @abstractmethod
     def get_action(self, state: State) -> Action:
         pass
 
+    @abstractmethod
     def take_action(self, state: State, action: Action) -> State:
         pass
 
+    @abstractmethod
     def get_utility(self, state: State) -> int:
         pass
 
-# Very simple agent for defender
+#agent that does nothing, can act as defender or attacker
 class PassiveAgent(Agent):
     def __init__(self) -> None:
         super().__init__(get_logger("PassiveAgent"))
@@ -56,7 +62,11 @@ class PassiveAgent(Agent):
 
     def get_utility(self, state: State) -> int:
         return 0
+#endregion Base stuff
 
+###############################
+#region human design agents
+###############################
 class BasicDefenderAgent(Agent):
     num_vehicles_monitoring_constraint: int
     recently_monitored: Deque[Vehicle]
@@ -174,9 +184,6 @@ class BasicDefenderAgent(Agent):
             kick=frozenset(kick)
         )
 
-# Very simple agent for attacker
-
-
 class BasicAttackerAgent(Agent):
     def __init__(self, attack_limit:int = 1) -> None:
         super().__init__(get_logger("BasicAttackerAgent"))
@@ -236,3 +243,75 @@ class BasicAttackerAgent(Agent):
                 attack.add(candidates.pop()[0])
 
         return AttackerAction(attack=frozenset(attack))
+
+#endregion human design agents
+
+###############################
+#region ml agents
+###############################
+
+from utils import get_logger, get_device
+from models import AttackerDQN, ShapeData
+import torch
+
+
+#region old
+# class RLDefenderAgent(BasicDefenderAgent):
+#     def __init__(self, monitor_limit: int, shape_data: ShapeData) -> None:
+#         super().__init__(
+#             monitor_limit=monitor_limit
+#         )
+#         self.logger = get_logger("RLDefenderAgent")
+#         device = get_device()
+#         self.shape_data = shape_data
+#         self.policy_net = DefenderDQN(shape_data).to(device)
+#         self.target_net = DefenderDQN(shape_data).to(device)
+#         self.target_net.load_state_dict(self.policy_net.state_dict())
+#         self.target_net.eval()
+    
+#     def get_action(self, state: State) -> DefenderAction:
+#         return self.policy_net.get_actions([state])[0]
+
+#     def get_random_action(self, state: State) -> DefenderAction:
+#         members = [i for i,v in enumerate(state.vehicles) if v.in_platoon]
+#         non_members = [i for i,v in enumerate(state.vehicles) if not v.in_platoon]
+#         return DefenderAction(
+#             monitor=frozenset(random.sample(members, min(self.monitor_limit, len(members)))),
+#             join=frozenset(random.sample(non_members, random.randint(0,len(non_members)))),
+#             kick=frozenset(random.sample(members, len(members)))
+#         )
+
+
+
+# class RLAttackerAgent(BasicAttackerAgent):
+#     def __init__(self, game: Game) -> None:
+#         super().__init__(get_logger("RLAttackerAgent"))
+#         device = get_device()
+#         self.game = game
+#         self.policy_net = AttackerDQN(100,100,100).to(device)
+#         self.target_net = AttackerDQN(100,100,100).to(device)
+#         self.target_net.load_state_dict(self.policy_net.state_dict())
+#         self.target_net.eval()
+
+
+#     def take_action(self, state: State, action: DefenderAction) -> State:
+#         return BasicAttackerAgent.take_action(self, state, action)
+    
+#     def get_action(self, state: State) -> DefenderAction:
+#         state_quant = self.quantify(state)
+#         with torch.no_grad():
+#             action_quant = self.policy_net(state_quant).max(1)[1].view(1,1)
+#         return self.dequantify_action(action_quant)
+
+#     def get_random_action(self, state: State) -> AttackerAction:
+#         pass
+
+#     def quantify_state(self, state: State) -> torch.Tensor:
+#         pass
+
+#     def dequantify_action(self, quant: torch.Tensor) ->DefenderAction:
+#         pass
+    
+# RLAgent = Union[RLAttackerAgent, RLDefenderAgent]
+#endregion old
+#endregion ml agents
