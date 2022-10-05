@@ -137,6 +137,7 @@ class DefenderCritic(nn.Module):
 
         # print(x_a.shape, x_b.shape, "x_a, x_b")
 
+        # todo: make sure the flatten doesn't run the batch dimension
         x = torch.cat((x_a.flatten(start_dim=1), x_b.flatten(start_dim=1), action.members, action.monitor), dim=1)
         # print(x.shape, "flat")
 

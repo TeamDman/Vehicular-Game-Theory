@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 import random
+from re import M
 from typing import Deque, List, Set, Union, FrozenSet, TYPE_CHECKING
 from models import StateShapeData
 from utils import get_logger
@@ -21,28 +22,28 @@ class DefenderAction:
 
     def as_tensor(self):
         return DefenderActionTensors(
-            members=torch.as_tensor(self.members),
-            monitor=torch.as_tensor(self.monitor),
+            members=torch.as_tensor(self.members).unsqueeze(dim=0),
+            monitor=torch.as_tensor(self.monitor).unsqueeze(dim=0),
         )
         
-
 @dataclass(frozen=True)
 class DefenderActionTensors:
-    members: torch.Tensor # 'binary' vector len=|vehicles|
-    monitor: torch.Tensor # 'binary' vector len=|vehicles|
+    members: torch.Tensor # batch, 'binary' vector len=|vehicles|
+    monitor: torch.Tensor # batch, 'binary' vector len=|vehicles|
+
 
 @dataclass(frozen=True)
 class AttackerAction:
-    attack: FrozenSet[int] # 'binary' vector len=|vehicles|
+    attack: FrozenSet[int] # binary vector len=|vehicles|
 
     def as_tensor(self):
         return AttackerActionTensors(
-            attack=torch.as_tensor(self.attack),
+            attack=torch.as_tensor(self.attack).unsqueeze(dim=0),
         )
 
 @dataclass(frozen=True)
 class AttackerActionTensors:
-    attack: torch.Tensor
+    attack: torch.Tensor # batch, 'binary' vector len=|vehicles|
 
 
 Action = Union[DefenderAction, AttackerAction]
@@ -310,59 +311,28 @@ class WolpertingerDefenderAgent(DefenderAgent):
         state_obj: State
     ) -> DefenderAction:
         # convert from state object to tensors to be fed to the actor model
-        state_tensor = state_obj.as_tensors(self.state_shape_data)
+        state = state_obj.as_tensors(self.state_shape_data)
         
         # get action suggestions from the actor
-        proto_actions = self.actor(*state_tensor)
+        proto_actions: DefenderActionTensors = self.actor(state)
+        # todo: introduce epsilon-decaying noise to this while training
+        # todo: clip from -1 to 1
 
-        # convert suggestions to actual actions
+        # convert proto actions to actual actions: -lt 0 => 0, -gt 0 => 1
+        actions = DefenderActionTensors(
+            members=proto_actions.members.heaviside(torch.tensor(1.)),
+            monitor=proto_actions.monitor.heaviside(torch.tensor(1.)),
+        )
+
+        # grade the acctions using the critic
+        action_q_values: torch.Tensor = self.critic(state, actions)
+
+        # find the best action
+        best_action_index = action_q_values.argmax()
+
+        # convert binary vectors to vector of indices
+        return DefenderAction(
+            members=actions.members[best_action_index].nonzero().squeeze(),
+            monitor=actions.monitor[best_action_index].nonzero().squeeze(),
+        )
         
-        
-#region old
-# class RLDefenderAgent(BasicDefenderAgent):
-#     def __init__(self, monitor_limit: int, shape_data: ShapeData) -> None:
-#         super().__init__(
-#             monitor_limit=monitor_limit
-#         )
-#         self.logger = get_logger("RLDefenderAgent")
-#         device = get_device()
-#         self.shape_data = shape_data
-#         self.policy_net = DefenderDQN(shape_data).to(device)
-#         self.target_net = DefenderDQN(shape_data).to(device)
-#         self.target_net.load_state_dict(self.policy_net.state_dict())
-#         self.target_net.eval()
-    
-#     def get_action(self, state: State) -> DefenderAction:
-#         return self.policy_net.get_actions([state])[0]
-
-
-
-# class RLAttackerAgent(BasicAttackerAgent):
-#     def __init__(self, game: Game) -> None:
-#         super().__init__(get_logger("RLAttackerAgent"))
-#         device = get_device()
-#         self.game = game
-#         self.policy_net = AttackerDQN(100,100,100).to(device)
-#         self.target_net = AttackerDQN(100,100,100).to(device)
-#         self.target_net.load_state_dict(self.policy_net.state_dict())
-#         self.target_net.eval()
-
-
-#     def take_action(self, state: State, action: DefenderAction) -> State:
-#         return BasicAttackerAgent.take_action(self, state, action)
-    
-#     def get_action(self, state: State) -> DefenderAction:
-#         state_quant = self.quantify(state)
-#         with torch.no_grad():
-#             action_quant = self.policy_net(state_quant).max(1)[1].view(1,1)
-#         return self.dequantify_action(action_quant)
-
-#     def quantify_state(self, state: State) -> torch.Tensor:
-#         pass
-
-#     def dequantify_action(self, quant: torch.Tensor) ->DefenderAction:
-#         pass
-    
-# RLAgent = Union[RLAttackerAgent, RLDefenderAgent]
-#endregion old
-#endregion ml agents
