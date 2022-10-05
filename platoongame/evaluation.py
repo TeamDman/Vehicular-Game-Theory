@@ -34,11 +34,11 @@ class Evaluator:
             vehicle_provider=self.vehicle_provider
         )
 
-    def run(self):
+    def run(self, defender_agent: Agent, attacker_agent: Agent):
         self.reset()
         self.track_stats()
         for i in range(self.num_rounds):
-            self.step()
+            self.step(defender_agent, attacker_agent)
     
     def step(self, defender_agent: Agent, attacker_agent: Agent):
         self.game.step(

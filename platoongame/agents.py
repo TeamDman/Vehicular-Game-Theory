@@ -3,7 +3,7 @@ import logging
 import random
 from re import M
 from typing import Deque, List, Set, Union, FrozenSet, TYPE_CHECKING
-from models import StateShapeData
+from models import StateShapeData, DefenderActionTensors, AttackerActionTensors
 from utils import get_logger
 from vehicles import CompromiseState, Vehicle
 from pprint import pprint
@@ -26,10 +26,7 @@ class DefenderAction:
             monitor=torch.as_tensor(self.monitor).unsqueeze(dim=0),
         )
         
-@dataclass(frozen=True)
-class DefenderActionTensors:
-    members: torch.Tensor # batch, 'binary' vector len=|vehicles|
-    monitor: torch.Tensor # batch, 'binary' vector len=|vehicles|
+
 
 
 @dataclass(frozen=True)
@@ -40,10 +37,6 @@ class AttackerAction:
         return AttackerActionTensors(
             attack=torch.as_tensor(self.attack).unsqueeze(dim=0),
         )
-
-@dataclass(frozen=True)
-class AttackerActionTensors:
-    attack: torch.Tensor # batch, 'binary' vector len=|vehicles|
 
 
 Action = Union[DefenderAction, AttackerAction]
@@ -111,8 +104,8 @@ class DefenderAgent(Agent):
             vehicle = replace(vehicle, vulnerabilities=tuple([vuln if vuln.state != CompromiseState.COMPROMISED_UNKNOWN else replace(vuln, state = CompromiseState.COMPROMISED_KNOWN) for vuln in vehicle.vulnerabilities]))
             vehicles[i] = vehicle
 
-        for i in vehicles:
-            vehicles[i] = replace(vehicles[i], in_platoon = action.members[i] == 1)
+        for i, v in enumerate(vehicles):
+            vehicles[i] = replace(v, in_platoon = i in action.members)
             # self.logger.info(f"kicking vehicle {i} out of platoon")
             # self.logger.info(f"adding vehicle {i} to platoon")
             
@@ -133,9 +126,8 @@ class DefenderAgent(Agent):
         members = [i for i,v in enumerate(state.vehicles) if v.in_platoon]
         non_members = [i for i,v in enumerate(state.vehicles) if not v.in_platoon]
         return DefenderAction(
+            members=frozenset(random.sample(range(len(state.vehicles)), random.randint(len(state.vehicles)))),
             monitor=frozenset(random.sample(members, min(self.monitor_limit, len(members)))),
-            join=frozenset(random.sample(non_members, random.randint(0,len(non_members)))),
-            kick=frozenset(random.sample(members, len(members)))
         )
 
 class AttackerAgent(Agent):
@@ -242,12 +234,14 @@ class BasicDefenderAgent(DefenderAgent):
             # take while there's room in the platoon
             join.append(candidates.pop())
 
-        members = [1 if v.in_platoon else 0 for v in state.vehicles]
+        members = torch.tensor([1 if v.in_platoon else 0 for v in state.vehicles])
         members[kick] = 0
         members[join] = 1
+        members = members.nonzero().squeeze()
+        members = members.numpy()
 
         return DefenderAction(
-            jmembers=frozenset(members),
+            members=frozenset(members),
             monitor=frozenset(monitor),
         )
 

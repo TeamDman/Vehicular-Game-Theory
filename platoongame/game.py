@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from re import S
 from typing import FrozenSet, List, Tuple, Literal, TYPE_CHECKING
+from models import StateTensors, StateShapeData
 from utils import get_logger
 from vehicles import Vehicle, VehicleProvider, Vulnerability
 import logging
@@ -11,7 +12,6 @@ import vehicles
 
 if TYPE_CHECKING:
     from agents import Agent
-    from models import StateShapeData
 
 
 @dataclass(frozen=True)
@@ -41,10 +41,6 @@ class State:
             vehicles=(shape_data.num_vehicles, Vehicle.get_shape()[0]),
         )
 
-@dataclass(frozen=True)
-class StateTensors:
-    vulnerabilities: torch.Tensor# (BatchSize, Vehicle, Vuln, VulnFeature)
-    vehicles: torch.Tensor# (BatchSize, Vehicle, VehicleFeature)
 
 @dataclass
 class GameConfig:
