@@ -1,56 +1,65 @@
+from abc import ABC, abstractmethod
 from collections import deque, namedtuple
+from dataclasses import dataclass
 import random
+from typing import List, Union
+from agents import Action
+from game import State
 
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+@dataclass(frozen=True)
+class Transition:
+    state: State
+    action: Action
+    reward: float
+    next_state: Union[State, None]
+    terminal: bool
 
-# Our game doesn't have a "terminal state" so that simplifies things
-
-class ReplayMemory:
-    def __init__(self, capacity: int):
+class ReplayMemory(ABC):
+    def __init__(self) -> None:
         pass
 
-    def push(self, *v):
-        raise NotImplementedError()
+    @abstractmethod
+    def push(self, v: Transition) -> None:
+        pass
 
-    def sample(self, batch_size):
-        raise NotImplementedError()
+    @abstractmethod
+    def sample(self, batch_size: int) -> List[Transition]:
+        pass
 
-    def __len__(self):
-        raise NotImplementedError()
+    @abstractmethod
+    def __len__(self) -> int:
+        pass
 
 class DequeReplayMemory:
-    def __init__(self, capacity: int):
+    def __init__(self, capacity: int) -> None:
         self.memory = deque([],maxlen=capacity)
 
-    def push(self, *v):
-        """Save a transition"""
-        self.memory.append(Transition(*v))
+    def push(self, v: Transition) -> None:
+        self.memory.append(v)
 
-    def sample(self, batch_size):
+    def sample(self, batch_size: int) -> List[Transition]:
         return random.sample(self.memory, batch_size)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.memory)
 
-# By Shashank Srikanth
-# https://github.com/nikhil3456/Deep-Reinforcement-Learning-in-Large-Discrete-Action-Spaces/blob/master/memory.py#L36
+# from https://github.com/ghliu/pytorch-ddpg/blob/master/memory.py#L36
 class RingReplayMemory(object):
-    def __init__(self, maxlen):
+    def __init__(self, maxlen: int) -> None:
         self.maxlen = maxlen
         self.start = 0
         self.length = 0
         self.data = [None for _ in range(maxlen)]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.length
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Transition:
         if idx < 0 or idx >= self.length:
             raise KeyError()
         return self.data[(self.start + idx) % self.maxlen]
 
-    def push(self, *v):
+    def push(self, v: Transition) -> None:
         if self.length < self.maxlen:
             # We have space, simply increase the length.
             self.length += 1
@@ -60,7 +69,7 @@ class RingReplayMemory(object):
         else:
             # This should never happen.
             raise RuntimeError()
-        self.data[(self.start + self.length - 1) % self.maxlen] = Transition(*v)
+        self.data[(self.start + self.length - 1) % self.maxlen] = v
 
-    def sample(self, batch_size):
+    def sample(self, batch_size: int) -> List[Transition]:
         return [self[i] for i in random.sample(range(len(self)), batch_size)]

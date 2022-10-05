@@ -22,8 +22,6 @@ class Metrics:
 
 @dataclass
 class Evaluator:
-    attacker: Agent
-    defender: Agent
     num_rounds: int
     game_config: GameConfig
     vehicle_provider: VehicleProvider
@@ -42,10 +40,10 @@ class Evaluator:
         for i in range(self.num_rounds):
             self.step()
     
-    def step(self):
+    def step(self, defender_agent: Agent, attacker_agent: Agent):
         self.game.step(
-            attacker_agent=self.attacker,
-            defender_agent=self.defender,
+            attacker_agent=attacker_agent,
+            defender_agent=defender_agent,
         )
         self.track_stats()
 

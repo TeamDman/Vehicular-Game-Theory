@@ -27,6 +27,9 @@ class Vulnerability:
             1 if self.state == CompromiseState.COMPROMISED_KNOWN else 0
         ])
 
+    @staticmethod
+    def get_shape():
+        return (4,)
 
 @dataclass(frozen=True)
 class Vehicle:
@@ -45,6 +48,10 @@ class Vehicle:
             1 if self.in_platoon else 0,
             self.risk
         ])
+
+    @staticmethod
+    def get_shape():
+        return (2,)
 
 class VehicleProvider:
     max_vulns: int

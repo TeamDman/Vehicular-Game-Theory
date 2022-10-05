@@ -3,7 +3,7 @@ from dataclasses import dataclass, replace
 from re import S
 from typing import FrozenSet, List, Tuple, Literal, TYPE_CHECKING
 from utils import get_logger
-from vehicles import Vehicle, VehicleProvider
+from vehicles import Vehicle, VehicleProvider, Vulnerability
 import logging
 import random
 import torch
@@ -11,7 +11,7 @@ import vehicles
 
 if TYPE_CHECKING:
     from agents import Agent
-    from reinforcement_learning import ShapeData
+    from models import StateShapeData
 
 
 @dataclass(frozen=True)
@@ -20,15 +20,32 @@ class State:
     defender_utility: int = 0
     attacker_utility: int = 0
 
-    def as_tensors(self, shape_data: ShapeData) -> Tuple[torch.Tensor, torch.Tensor]:
-        vulns_quant = torch.zeros((shape_data.num_vehicles, shape_data.num_vulns, vehicles.Vulnerability(0,0).as_tensor().shape[0]))
-        vehicles_quant = torch.zeros((shape_data.num_vehicles, vehicles.Vehicle(0,0).as_tensor().shape[0]))
+    def as_tensors(self, shape_data: StateShapeData) -> StateTensors:
+        # todo: use shapedata num features instead of calculating
+        shape = self.get_shape(shape_data)
+        vulns_quant = torch.zeros(shape[0])
+        vehicles_quant = torch.zeros(shape[1])
         for i, vehicle in enumerate(self.vehicles):
             vehicles_quant[i] = vehicle.as_tensor()
             for j, vuln in enumerate(vehicle.vulnerabilities):
                 vulns_quant[i,j] = vuln.as_tensor()
-        return vulns_quant, vehicles_quant
-                
+        return StateTensors(
+            vulnerabilities=vulns_quant,
+            vehicles=vehicles_quant,
+        )
+
+    @staticmethod
+    def get_shape(shape_data: StateShapeData) -> StateTensors:
+        return StateTensors(
+            vulnerabilities=(shape_data.num_vehicles, shape_data.num_vulns, Vulnerability.get_shape()[0]),
+            vehicles=(shape_data.num_vehicles, Vehicle.get_shape()[0]),
+        )
+
+@dataclass(frozen=True)
+class StateTensors:
+    vulnerabilities: torch.Tensor# (BatchSize, Vehicle, Vuln, VulnFeature)
+    vehicles: torch.Tensor# (BatchSize, Vehicle, VehicleFeature)
+
 @dataclass
 class GameConfig:
     max_vehicles: int = 10
