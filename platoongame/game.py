@@ -22,9 +22,9 @@ class State:
 
     def as_tensors(self, shape_data: StateShapeData) -> StateTensors:
         # todo: use shapedata num features instead of calculating
-        shape = self.get_shape(shape_data)
-        vulns_quant = torch.zeros(shape[0])
-        vehicles_quant = torch.zeros(shape[1])
+        shape = State.get_shape(shape_data)
+        vulns_quant = torch.zeros(shape.vulnerabilities)
+        vehicles_quant = torch.zeros(shape.vehicles)
         for i, vehicle in enumerate(self.vehicles):
             vehicles_quant[i] = vehicle.as_tensor()
             for j, vuln in enumerate(vehicle.vulnerabilities):

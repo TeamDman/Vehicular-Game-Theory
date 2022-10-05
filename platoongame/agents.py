@@ -125,9 +125,10 @@ class DefenderAgent(Agent):
     def get_random_action(self, state: State) -> DefenderAction:
         members = [i for i,v in enumerate(state.vehicles) if v.in_platoon]
         non_members = [i for i,v in enumerate(state.vehicles) if not v.in_platoon]
+        max_rand_monitor = 1
         return DefenderAction(
-            members=frozenset(random.sample(range(len(state.vehicles)), random.randint(len(state.vehicles)))),
-            monitor=frozenset(random.sample(members, min(self.monitor_limit, len(members)))),
+            members=frozenset(random.sample(range(len(state.vehicles)), random.randint(0,len(state.vehicles)))),
+            monitor=frozenset([] if len(members) < max_rand_monitor else random.sample(members, max_rand_monitor)),
         )
 
 class AttackerAgent(Agent):
@@ -292,8 +293,8 @@ class WolpertingerDefenderAgent(DefenderAgent):
         self.actor_target = DefenderActor(state_shape_data, propose=5)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=0.0001)
 
-        self.critic = DefenderCritic(state_shape_data)
-        self.critic_target = DefenderCritic(state_shape_data)
+        self.critic = DefenderCritic()
+        self.critic_target = DefenderCritic()
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=0.0001)
 
         # hard update

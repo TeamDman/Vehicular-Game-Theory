@@ -26,6 +26,7 @@
 
 from dataclasses import dataclass, field
 from typing import List, Union
+from warnings import warn
 from evaluation import Evaluator, Metrics
 from game import State, StateTensors
 
@@ -76,6 +77,8 @@ class WolpertingerDefenderAgentTrainer:
         evaluator: Evaluator,
         warmup: int,
     ) -> List[List[Metrics]]:
+        if (warmup < self.batch_size):
+            raise ValueError("warmup must be greater than batch size")
         stats_history: List[List[Metrics]] = []
         for episode in range(episodes):
             evaluator.reset()
@@ -92,7 +95,7 @@ class WolpertingerDefenderAgentTrainer:
                 evaluator.game.logger.debug(f"attacker turn end")
                 
                 evaluator.game.logger.debug(f"defender turn begin")
-                action = self.get_action(defender_agent, defender_agent, evaluator.game.state)
+                action = self.get_action(defender_agent, evaluator.game.state)
                 evaluator.game.state = defender_agent.take_action(evaluator.game.state, action)
                 evaluator.game.logger.debug(f"defender turn end")
 

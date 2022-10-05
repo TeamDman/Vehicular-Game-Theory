@@ -36,6 +36,8 @@ class DefenderActor(nn.Module):
         state_shape_data: StateShapeData,
         propose: int, # how many actions the actor should propose
     ) -> None:
+        super(DefenderActor, self).__init__()
+
         self.vuln_conv = nn.LazyConv2d(
             out_channels=8,
             kernel_size=5,
@@ -107,6 +109,8 @@ class DefenderCritic(nn.Module):
     def __init__(
         self,
     ) -> None:
+        super(DefenderCritic, self).__init__()
+
         self.vuln_conv = nn.LazyConv2d(
             out_channels=8,
             kernel_size=5,
