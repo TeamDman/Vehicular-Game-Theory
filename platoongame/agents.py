@@ -3,7 +3,7 @@ import logging
 import random
 from re import M
 from typing import Deque, List, Set, Union, FrozenSet, TYPE_CHECKING
-from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch
+from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
 from utils import get_logger
 from vehicles import CompromiseState, Vehicle
 from pprint import pprint
@@ -315,7 +315,11 @@ class WolpertingerDefenderAgent(DefenderAgent):
         state_obj: State
     ) -> DefenderAction:
         # convert from state object to tensors to be fed to the actor model
-        state = state_obj.as_tensors(self.state_shape_data).to(get_device())
+        state = state_obj.as_tensors(self.state_shape_data)
+        state = StateTensorBatch(
+            vulnerabilities=state.vulnerabilities.to(get_device()),
+            vehicles=state.vehicles.to(get_device()),
+        )
         
         # get action suggestions from the actor
         proto_actions: DefenderActionTensorBatch = self.actor(state)
