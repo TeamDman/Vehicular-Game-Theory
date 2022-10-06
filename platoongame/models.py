@@ -37,18 +37,18 @@ class DefenderActor(nn.Module):
     ) -> None:
         super(DefenderActor, self).__init__()
         
-        self.vuln_conv = nn.LazyConv2d(
-            out_channels=8,
-            kernel_size=5,
-            stride=2
-        )
+        # self.vuln_conv = nn.LazyConv2d(
+        #     out_channels=8,
+        #     kernel_size=5,
+        #     stride=2
+        # )
         self.vuln_norm = nn.LazyBatchNorm2d()
         
-        self.vehicle_conv = nn.LazyConv1d(
-            out_channels = 4,
-            kernel_size=2,
-            stride=1
-        )
+        # self.vehicle_conv = nn.LazyConv1d(
+        #     out_channels = 4,
+        #     kernel_size=2,
+        #     stride=1
+        # )
         self.vehicle_norm = nn.LazyBatchNorm1d()
 
         self.hidden1 = nn.LazyLinear(out_features = 400)
@@ -72,11 +72,14 @@ class DefenderActor(nn.Module):
         self,
         state: StateTensorBatch
     ) -> DefenderActionTensorBatch:
-        x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
-        x_a = F.relu(self.vuln_norm(x_a))
+        x_a = self.vuln_norm(state.vulnerabilities)
+        x_a = F.relu(x_a)
+        # x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
+        # x_a = F.relu(self.vuln_norm(x_a))
 
-        x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
-        x_b = F.relu(self.vehicle_norm(x_b))
+        # x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
+        x_b = self.vehicle_norm(state.vehicles)
+        x_b = F.relu(x_b)
 
         x = torch.cat((
             x_a.flatten(start_dim=1),
@@ -105,18 +108,18 @@ class DefenderCritic(nn.Module):
     ) -> None:
         super(DefenderCritic, self).__init__()
 
-        self.vuln_conv = nn.LazyConv2d(
-            out_channels=8,
-            kernel_size=5,
-            stride=2
-        )
+        # self.vuln_conv = nn.LazyConv2d(
+        #     out_channels=8,
+        #     kernel_size=5,
+        #     stride=2
+        # )
         self.vuln_norm = nn.LazyBatchNorm2d()
         
-        self.vehicle_conv = nn.LazyConv1d(
-            out_channels = 4,
-            kernel_size=2,
-            stride=1
-        )
+        # self.vehicle_conv = nn.LazyConv1d(
+        #     out_channels = 4,
+        #     kernel_size=2,
+        #     stride=1
+        # )
         self.vehicle_norm = nn.LazyBatchNorm1d()
 
 
@@ -146,11 +149,13 @@ class DefenderCritic(nn.Module):
 
         actions_per_batch = actions.members.shape[1]
 
-        x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
+        x_a = state.vulnerabilities
+        # x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
         x_a = F.relu(self.vuln_norm(x_a))
         x_a = x_a.flatten(start_dim=1).repeat(actions_per_batch,1)
 
-        x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
+        x_b = state.vehicles
+        # x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
         x_b = F.relu(self.vehicle_norm(x_b))
         x_b = x_b.flatten(start_dim=1).repeat(actions_per_batch,1)
 
