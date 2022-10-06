@@ -337,7 +337,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         action_q_values: torch.Tensor = self.critic(state, actions)
 
         # find the best action
-        best_action_indices = action_q_values.argmax(dim=1)
+        best_action_indices = action_q_values.argmax(dim=1).cpu()
         assert len(best_action_indices) == 1
         best = best_action_indices[0]
 
@@ -352,7 +352,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         num_proposals = 5
         def propose(t: torch.Tensor) -> torch.Tensor:
             noise = torch.linspace(-0.5, +0.5, num_proposals).unsqueeze(dim=1)
-            return (t.repeat(1,num_proposals,1) + noise).heaviside(torch.tensor(1.)) #.flatten(0,1)
+            return (t.repeat(1,num_proposals,1) + noise).heaviside(torch.tensor(1.).to(get_device())) #.flatten(0,1)
         return DefenderActionTensorBatch(
             members=propose(proto_actions.members),
             monitor=propose(proto_actions.monitor),
