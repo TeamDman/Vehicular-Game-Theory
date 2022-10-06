@@ -1,7 +1,7 @@
 from __future__ import annotations 
 from dataclasses import dataclass, replace
 from re import S
-from typing import FrozenSet, List, Tuple, Literal, TYPE_CHECKING
+from typing import FrozenSet, List, Tuple, TYPE_CHECKING
 from models import StateTensorBatch, StateShapeData
 from utils import get_logger
 from vehicles import Vehicle, VehicleProvider, Vulnerability
@@ -52,7 +52,6 @@ class Game:
     state: State
     vehicle_provider: VehicleProvider
     logger: logging.Logger
-    turn: Literal["defender","attacker"]
     step_count: int
     config: GameConfig
     def __init__(self, config: GameConfig, vehicle_provider: VehicleProvider) -> None:
@@ -64,7 +63,6 @@ class Game:
 
     def reset(self) -> None:
         self.logger.info("resetting game")
-        self.turn = "defender"
         self.vehicle_provider.reset()
         self.state = State(vehicles=tuple([self.vehicle_provider.next() for _ in range(self.config.max_vehicles)]))
 
