@@ -25,7 +25,7 @@ class Vulnerability:
             # split compromised/known state apart to help model learn
             0 if self.state == CompromiseState.NOT_COMPROMISED else 0, 
             1 if self.state == CompromiseState.COMPROMISED_KNOWN else 0
-        ])
+        ], dtype=torch.float32)
 
     @staticmethod
     def get_shape():
@@ -47,7 +47,7 @@ class Vehicle:
         return torch.tensor([
             1 if self.in_platoon else 0,
             self.risk
-        ])
+        ], dtype=torch.float32)
 
     @staticmethod
     def get_shape():

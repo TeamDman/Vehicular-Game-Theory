@@ -3,7 +3,7 @@ import logging
 import random
 from re import M
 from typing import Deque, List, Set, Union, FrozenSet, TYPE_CHECKING
-from models import StateShapeData, DefenderActionTensors, AttackerActionTensors
+from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch
 from utils import get_logger
 from vehicles import CompromiseState, Vehicle
 from pprint import pprint
@@ -20,12 +20,16 @@ class DefenderAction:
     members: FrozenSet[int] # binary vector, indices of corresponding vehicle
     monitor: FrozenSet[int] # binary vector, indices of corresponding vehicle
 
-    def as_tensor(self):
-        return DefenderActionTensors(
-            members=torch.as_tensor(self.members).unsqueeze(dim=0),
-            monitor=torch.as_tensor(self.monitor).unsqueeze(dim=0),
+    def as_tensor(self, state_shape: StateShapeData):
+        members = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
+        members[list(self.members)] = 1
+        monitor = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
+        monitor[list(self.monitor)] = 1
+
+        return DefenderActionTensorBatch(
+            members=members.unsqueeze(dim=0),
+            monitor=monitor.unsqueeze(dim=0),
         )
-        
 
 
 
@@ -33,9 +37,11 @@ class DefenderAction:
 class AttackerAction:
     attack: FrozenSet[int] # binary vector len=|vehicles|
 
-    def as_tensor(self):
-        return AttackerActionTensors(
-            attack=torch.as_tensor(self.attack).unsqueeze(dim=0),
+    def as_tensor(self, state_shape: StateShapeData):
+        attack = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
+        attack[list(self.attack)] = 1
+        return AttackerActionTensorBatch(
+            attack=attack.unsqueeze(dim=0),
         )
 
 
@@ -289,8 +295,8 @@ class WolpertingerDefenderAgent(DefenderAgent):
 
         self.state_shape_data = state_shape_data
 
-        self.actor = DefenderActor(state_shape_data, propose=5)
-        self.actor_target = DefenderActor(state_shape_data, propose=5)
+        self.actor = DefenderActor(state_shape_data)
+        self.actor_target = DefenderActor(state_shape_data)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=0.0001)
 
         self.critic = DefenderCritic()
@@ -309,25 +315,38 @@ class WolpertingerDefenderAgent(DefenderAgent):
         state = state_obj.as_tensors(self.state_shape_data)
         
         # get action suggestions from the actor
-        proto_actions: DefenderActionTensors = self.actor(state)
+        proto_actions: DefenderActionTensorBatch = self.actor(state)
         # todo: introduce epsilon-decaying noise to this while training
         # todo: clip from -1 to 1
 
         # convert proto actions to actual actions: -lt 0 => 0, -gt 0 => 1
-        actions = DefenderActionTensors(
-            members=proto_actions.members.heaviside(torch.tensor(1.)),
-            monitor=proto_actions.monitor.heaviside(torch.tensor(1.)),
-        )
+        actions = self.collapse_proto_actions(proto_actions)
+
+        # should be a batch of 1
+        assert actions.members.shape[0] == 1
+        assert actions.monitor.shape[0] == 1
 
         # grade the acctions using the critic
         action_q_values: torch.Tensor = self.critic(state, actions)
 
         # find the best action
-        best_action_index = action_q_values.argmax()
+        best_action_indices = action_q_values.argmax(dim=1)
+        assert len(best_action_indices) == 1
+        best = best_action_indices[0]
 
         # convert binary vectors to vector of indices
         return DefenderAction(
-            members=actions.members[best_action_index].nonzero().squeeze(),
-            monitor=actions.monitor[best_action_index].nonzero().squeeze(),
+            members=frozenset(actions.members[0][best].nonzero().squeeze().numpy()),
+            monitor=frozenset(actions.monitor[0][best].nonzero().squeeze().numpy()),
         )
-        
+    
+    # Converts latent action into multiple potential actions
+    def collapse_proto_actions(self, proto_actions: DefenderActionTensorBatch) -> DefenderActionTensorBatch:
+        num_proposals = 5
+        def propose(t: torch.Tensor) -> torch.Tensor:
+            noise = torch.linspace(-0.5, +0.5, num_proposals).unsqueeze(dim=1)
+            return (t.repeat(1,num_proposals,1) + noise).heaviside(torch.tensor(1.)) #.flatten(0,1)
+        return DefenderActionTensorBatch(
+            members=propose(proto_actions.members),
+            monitor=propose(proto_actions.monitor),
+        )

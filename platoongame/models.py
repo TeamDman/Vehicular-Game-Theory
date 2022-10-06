@@ -14,18 +14,18 @@ class StateShapeData:
     num_vuln_features: int      # prob, severity, is_compromised, is_compromise_known
 
 @dataclass(frozen=True)
-class StateTensors:
+class StateTensorBatch:
     vulnerabilities: torch.Tensor# (BatchSize, Vehicle, Vuln, VulnFeature)
     vehicles: torch.Tensor# (BatchSize, Vehicle, VehicleFeature)
 
 
 @dataclass(frozen=True)
-class DefenderActionTensors:
+class DefenderActionTensorBatch:
     members: torch.Tensor # batch, 'binary' vector len=|vehicles|
     monitor: torch.Tensor # batch, 'binary' vector len=|vehicles|
 
 @dataclass(frozen=True)
-class AttackerActionTensors:
+class AttackerActionTensorBatch:
     attack: torch.Tensor # batch, 'binary' vector len=|vehicles|
 
 
@@ -34,10 +34,9 @@ class DefenderActor(nn.Module):
     def __init__(
         self,
         state_shape_data: StateShapeData,
-        propose: int, # how many actions the actor should propose
     ) -> None:
         super(DefenderActor, self).__init__()
-
+        
         self.vuln_conv = nn.LazyConv2d(
             out_channels=8,
             kernel_size=5,
@@ -71,36 +70,31 @@ class DefenderActor(nn.Module):
     
     def forward(
         self,
-        state: StateTensors
-    ) -> DefenderActionTensors:
-        # print(x_vulns.shape, "x_vulns")
+        state: StateTensorBatch
+    ) -> DefenderActionTensorBatch:
         x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
-        # print(x_a.shape, "x_a after conv")
         x_a = F.relu(self.vuln_norm(x_a))
-        # print(x_a.shape, "x_a after norm")
 
-        # print(x_vehicles.shape, "x_vehicle")
         x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
-        # print(x_b.shape, "x_b after conv")
         x_b = F.relu(self.vehicle_norm(x_b))
-        # print(x_b.shape, "x_b after norm")
 
-        # print(x_a.shape, x_b.shape, "x_a, x_b")
-
-        x = torch.cat((x_a.flatten(start_dim=1), x_b.flatten(start_dim=1)), dim=1)
-        # print(x.shape, "flat")
-
+        x = torch.cat((
+            x_a.flatten(start_dim=1),
+            x_b.flatten(start_dim=1)
+        ), dim=1)
         x = self.hidden1(x)
         x = F.relu(x)
         x = self.hidden2(x)
         x = F.relu(x)
 
         members_proto = torch.arctan(self.member_head(x))
-        # print(members.shape, "member")
         monitor_proto = torch.arctan(self.monitor_head(x))
-        # print(monitor.shape, "monitor")
 
-        return DefenderActionTensors(
+        # convert from [state,action] to [state,0,action] (action sub-batches of size 1 for each state)
+        members_proto = members_proto.unsqueeze(dim=1)
+        monitor_proto = monitor_proto.unsqueeze(dim=1)
+
+        return DefenderActionTensorBatch(
             members=members_proto,
             monitor=monitor_proto,
         )
@@ -135,26 +129,37 @@ class DefenderCritic(nn.Module):
         # self.monitor_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who to monitor
     def forward(
         self,
-        state: StateTensors, # the state as context for the action
-        action: DefenderActionTensors, # the action that is being graded
+        state: StateTensorBatch, # the state as context for the action
+        actions: DefenderActionTensorBatch, # the action that is being graded
     ) -> torch.tensor: # returns Q value (rating of the action)
-        # print(x_vulns.shape, "x_vulns")
+        assert len(state.vehicles.shape) == 3
+        assert len(state.vulnerabilities.shape) == 4
+        assert len(actions.members.shape) == 3
+        assert len(actions.monitor.shape) == 3
+
+        # vehicles and vulnerability batch sizes should match
+        assert state.vehicles.shape[0] == state.vulnerabilities.shape[0]
+        # members and monitor should match
+        assert actions.members.shape == actions.monitor.shape
+        # state and action batch sizes should match
+        assert state.vehicles.shape[0] == actions.members.shape[0]
+
+        actions_per_batch = actions.members.shape[1]
+
         x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
-        # print(x_a.shape, "x_a after conv")
         x_a = F.relu(self.vuln_norm(x_a))
-        # print(x_a.shape, "x_a after norm")
+        x_a = x_a.flatten(start_dim=1).repeat(actions_per_batch,1)
 
-        # print(x_vehicles.shape, "x_vehicle")
         x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
-        # print(x_b.shape, "x_b after conv")
         x_b = F.relu(self.vehicle_norm(x_b))
-        # print(x_b.shape, "x_b after norm")
+        x_b = x_b.flatten(start_dim=1).repeat(actions_per_batch,1)
 
-        # print(x_a.shape, x_b.shape, "x_a, x_b")
-
-        # todo: make sure the flatten doesn't run the batch dimension
-        x = torch.cat((x_a.flatten(start_dim=1), x_b.flatten(start_dim=1), action.members, action.monitor), dim=1)
-        # print(x.shape, "flat")
+        x = torch.hstack((
+            x_a,
+            x_b,
+            actions.members.flatten(0,1),
+            actions.monitor.flatten(0,1),
+        ))
 
         x = self.hidden1(x)
         x = F.relu(x)
@@ -162,4 +167,4 @@ class DefenderCritic(nn.Module):
         x = F.relu(x)
         x = self.score(x)
         x = F.tanh(x)
-        return x
+        return x.reshape(-1, actions_per_batch)

@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from re import S
 from typing import FrozenSet, List, Tuple, Literal, TYPE_CHECKING
-from models import StateTensors, StateShapeData
+from models import StateTensorBatch, StateShapeData
 from utils import get_logger
 from vehicles import Vehicle, VehicleProvider, Vulnerability
 import logging
@@ -20,25 +20,25 @@ class State:
     defender_utility: int = 0
     attacker_utility: int = 0
 
-    def as_tensors(self, shape_data: StateShapeData) -> StateTensors:
+    def as_tensors(self, shape_data: StateShapeData) -> StateTensorBatch:
         # todo: use shapedata num features instead of calculating
-        shape = State.get_shape(shape_data)
+        shape = State.get_shape(shape_data, batch_size=1)
         vulns_quant = torch.zeros(shape.vulnerabilities)
         vehicles_quant = torch.zeros(shape.vehicles)
         for i, vehicle in enumerate(self.vehicles):
-            vehicles_quant[i] = vehicle.as_tensor()
+            vehicles_quant[0][i] = vehicle.as_tensor()
             for j, vuln in enumerate(vehicle.vulnerabilities):
-                vulns_quant[i,j] = vuln.as_tensor()
-        return StateTensors(
+                vulns_quant[0][i,j] = vuln.as_tensor()
+        return StateTensorBatch(
             vulnerabilities=vulns_quant,
             vehicles=vehicles_quant,
         )
 
     @staticmethod
-    def get_shape(shape_data: StateShapeData) -> StateTensors:
-        return StateTensors(
-            vulnerabilities=(shape_data.num_vehicles, shape_data.num_vulns, Vulnerability.get_shape()[0]),
-            vehicles=(shape_data.num_vehicles, Vehicle.get_shape()[0]),
+    def get_shape(shape_data: StateShapeData, batch_size: int) -> StateTensorBatch:
+        return StateTensorBatch(
+            vulnerabilities=(batch_size, shape_data.num_vehicles, shape_data.num_vulns, Vulnerability.get_shape()[0]),
+            vehicles=(batch_size, shape_data.num_vehicles, Vehicle.get_shape()[0]),
         )
 
 
