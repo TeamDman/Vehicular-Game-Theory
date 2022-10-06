@@ -309,7 +309,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.critic_target.load_state_dict(self.critic.state_dict())
 
-    @torch.no_grad
+    @torch.no_grad()
     def get_action(
         self,
         state_obj: State
