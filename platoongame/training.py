@@ -177,7 +177,7 @@ class WolpertingerDefenderAgentTrainer:
             non_terminal_states = [not v.terminal for v in batch]
             
             # target q is initialized from the actual observed reward
-            target_q_batch = torch.as_tensor([v.reward for v in batch], dtype=torch.float32)
+            target_q_batch = torch.as_tensor([v.reward for v in batch], dtype=torch.float32).to(get_device())
             # target q is increased by discounted predicted future reward
             target_q_batch[non_terminal_states] += self.gamma * next_q_values[non_terminal_states].flatten()
             assert target_q_batch.shape == (self.batch_size,)
