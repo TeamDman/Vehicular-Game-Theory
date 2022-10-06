@@ -352,7 +352,11 @@ class WolpertingerDefenderAgent(DefenderAgent):
         num_proposals = 5
         def propose(t: torch.Tensor) -> torch.Tensor:
             noise = torch.linspace(-0.5, +0.5, num_proposals).unsqueeze(dim=1)
-            return (t.repeat(1,num_proposals,1) + noise).heaviside(torch.tensor(1.).to(get_device())) #.flatten(0,1)
+            rtn = t.repeat(1,num_proposals,1)
+            rtn += noise
+            zerovalue = torch.tensor(1.).to(get_device())
+            rtn = rtn.heaviside(zerovalue)
+            return rtn
         return DefenderActionTensorBatch(
             members=propose(proto_actions.members),
             monitor=propose(proto_actions.monitor),
