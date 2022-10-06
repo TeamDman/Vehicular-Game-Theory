@@ -11,6 +11,7 @@ import math
 from agents import Action, DefenderAction, DefenderActionTensorBatch, WolpertingerDefenderAgent, Agent
 
 import numpy as np
+from utils import get_device
 
 from vehicles import Vulnerability
 
@@ -119,6 +120,27 @@ class WolpertingerDefenderAgentTrainer:
     ) -> None:
         batch = self.memory.sample(self.batch_size)
         shape_data = defender_agent.state_shape_data
+            
+        state_batch = [v.state.as_tensors(shape_data) for v in batch]
+        state_batch = StateTensorBatch(
+            vulnerabilities=torch.cat([v.vulnerabilities for v in state_batch]).to(get_device()),
+            vehicles=torch.cat([v.vehicles for v in state_batch]).to(get_device()),
+        )
+        
+        assert state_batch.vehicles.shape == (self.batch_size, shape_data.num_vehicles, shape_data.num_vehicle_features)
+        assert state_batch.vulnerabilities.shape == (self.batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)
+        assert state_batch.vehicles.shape[0] == state_batch.vulnerabilities.shape[0]
+
+        action_batch = [v.action.as_tensor(shape_data) for v in batch]
+        action_batch = DefenderActionTensorBatch(
+            members=torch.cat([v.members for v in action_batch]).to(get_device()),
+            monitor=torch.cat([v.monitor for v in action_batch]).to(get_device()),
+        )
+
+        assert action_batch.members.shape == (self.batch_size, 1, shape_data.num_vehicles)
+        assert action_batch.monitor.shape == (self.batch_size, 1, shape_data.num_vehicles)
+
+        # get the batch of next states for calculating q
         def coalesce_next_state(transition: Transition) -> StateTensorBatch:
             if transition.next_state is not None:
                 return transition.next_state.as_tensors(shape_data)
@@ -128,31 +150,10 @@ class WolpertingerDefenderAgentTrainer:
                     vulnerabilities=torch.zeros(shape.vulnerabilities),
                     vehicles=torch.zeros(shape.vehicles),
                 )
-            
-        state_batch = [v.state.as_tensors(shape_data) for v in batch]
-        state_batch = StateTensorBatch(
-            vulnerabilities=torch.cat([v.vulnerabilities for v in state_batch]),
-            vehicles=torch.cat([v.vehicles for v in state_batch]),
-        )
-        
-        assert state_batch.vehicles.shape == (self.batch_size, shape_data.num_vehicles, shape_data.num_vehicle_features)
-        assert state_batch.vulnerabilities.shape == (self.batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)
-        assert state_batch.vehicles.shape[0] == state_batch.vulnerabilities.shape[0]
-
-        action_batch = [v.action.as_tensor(shape_data) for v in batch]
-        action_batch = DefenderActionTensorBatch(
-            members=torch.cat([v.members for v in action_batch]),
-            monitor=torch.cat([v.monitor for v in action_batch]),
-        )
-
-        assert action_batch.members.shape == (self.batch_size, 1, shape_data.num_vehicles)
-        assert action_batch.monitor.shape == (self.batch_size, 1, shape_data.num_vehicles)
-
-        # get the batch of next states for calculating q
         next_state_batch = [coalesce_next_state(entry) for entry in batch]
         next_state_batch = StateTensorBatch(
-            vulnerabilities=torch.cat([v.vulnerabilities for v in next_state_batch]),
-            vehicles=torch.cat([v.vehicles for v in next_state_batch]),
+            vulnerabilities=torch.cat([v.vulnerabilities for v in next_state_batch]).to(get_device()),
+            vehicles=torch.cat([v.vehicles for v in next_state_batch]).to(get_device()),
         )
 
         assert next_state_batch.vulnerabilities.shape == state_batch.vulnerabilities.shape
@@ -221,4 +222,4 @@ class WolpertingerDefenderAgentTrainer:
         soft_update(defender_agent.actor_target, defender_agent.actor, self.tau)
         soft_update(defender_agent.critic_target, defender_agent.critic, self.tau)
 
-        return float(value_loss.detach().numpy())
+        return float(value_loss.detach().cpu().numpy())

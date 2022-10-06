@@ -309,12 +309,13 @@ class WolpertingerDefenderAgent(DefenderAgent):
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.critic_target.load_state_dict(self.critic.state_dict())
 
+    @torch.no_grad
     def get_action(
         self,
         state_obj: State
     ) -> DefenderAction:
         # convert from state object to tensors to be fed to the actor model
-        state = state_obj.as_tensors(self.state_shape_data)
+        state = state_obj.as_tensors(self.state_shape_data).to(get_device())
         
         # get action suggestions from the actor
         proto_actions: DefenderActionTensorBatch = self.actor(state)
@@ -338,8 +339,8 @@ class WolpertingerDefenderAgent(DefenderAgent):
 
         # convert binary vectors to vector of indices
         return DefenderAction(
-            members=frozenset(actions.members[0][best].nonzero().squeeze().numpy()),
-            monitor=frozenset(actions.monitor[0][best].nonzero().squeeze().numpy()),
+            members=frozenset(actions.members[0][best].cpu().nonzero().squeeze().numpy()),
+            monitor=frozenset(actions.monitor[0][best].cpu().nonzero().squeeze().numpy()),
         )
     
     # Converts latent action into multiple potential actions
