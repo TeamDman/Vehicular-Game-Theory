@@ -343,8 +343,8 @@ class WolpertingerDefenderAgent(DefenderAgent):
 
         # convert binary vectors to vector of indices
         return DefenderAction(
-            members=frozenset(actions.members[0][best].cpu().nonzero().squeeze().numpy()),
-            monitor=frozenset(actions.monitor[0][best].cpu().nonzero().squeeze().numpy()),
+            members=frozenset(list(actions.members[0][best].cpu().nonzero().squeeze().numpy())),
+            monitor=frozenset(list(actions.monitor[0][best].cpu().nonzero().squeeze().numpy())),
         )
     
     # Converts latent action into multiple potential actions

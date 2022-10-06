@@ -5,8 +5,8 @@
 import logging
 import sys
 
-# level = logging.WARN
-level = logging.DEBUG
+level = logging.WARN
+# level = logging.DEBUG
 
 # handler = logging.StreamHandler(sys.stdout)
 # enabling debug logging causes lag using streamhandler
