@@ -297,12 +297,12 @@ class WolpertingerDefenderAgent(DefenderAgent):
 
         self.state_shape_data = state_shape_data
 
-        self.actor = DefenderActor(state_shape_data)
-        self.actor_target = DefenderActor(state_shape_data)
+        self.actor = DefenderActor(state_shape_data).to(get_device())
+        self.actor_target = DefenderActor(state_shape_data).to(get_device())
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=0.0001)
 
-        self.critic = DefenderCritic()
-        self.critic_target = DefenderCritic()
+        self.critic = DefenderCritic().to(get_device())
+        self.critic_target = DefenderCritic().to(get_device())
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=0.0001)
 
         # hard update

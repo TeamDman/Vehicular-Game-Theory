@@ -1,29 +1,3 @@
-# from dataclasses import dataclass, field
-# from typing import List, Tuple, Union
-# import gym
-# import math
-# import random
-# import numpy as np
-# import matplotlib
-# import matplotlib.pyplot as plt
-# from collections import namedtuple
-# from itertools import count
-# from PIL import Image
-# from evaluation import Evaluator, Metrics
-# import vehicles
-
-# import torch
-# import torch.nn as nn
-# import torch.optim as optim
-# import torch.nn.functional as F
-# import torchvision.transforms as T
-
-# from agents import Action, Agent, DefenderAction, AttackerAction, BasicAttackerAgent, BasicDefenderAgent
-# from logging import Logger
-# from game import Game, State,GameConfig
-# from utils import get_logger, get_device
-# from memory import ReplayMemory, Transition
-
 from dataclasses import dataclass, field
 from typing import List, Union
 from warnings import warn
@@ -53,7 +27,6 @@ class WolpertingerDefenderAgentTrainer:
     eps_decay:float = 10000
     target_update_interval:int = 10
     steps_done:int = 0
-    device: torch.device = field(default_factory=lambda: torch.device("cpu"))
 
     def __post_init__(self):
         self.reset()
@@ -110,7 +83,6 @@ class WolpertingerDefenderAgentTrainer:
 
                 # calculate reward
                 reward = 0 if done else defender_agent.get_utility(evaluator.game.state)
-                # reward = torch.tensor([reward], device=self.device)
 
                 # add to memory
                 to_state = None if done else evaluator.game.state
