@@ -351,7 +351,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
     def collapse_proto_actions(self, proto_actions: DefenderActionTensorBatch) -> DefenderActionTensorBatch:
         num_proposals = 5
         def propose(t: torch.Tensor) -> torch.Tensor:
-            noise = torch.linspace(-0.5, +0.5, num_proposals).unsqueeze(dim=1)
+            noise = torch.linspace(-0.5, +0.5, num_proposals).unsqueeze(dim=1).to(get_device())
             rtn = t.repeat(1,num_proposals,1)
             rtn += noise
             zerovalue = torch.tensor(1.).to(get_device())
