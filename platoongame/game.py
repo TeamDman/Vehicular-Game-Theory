@@ -21,7 +21,6 @@ class State:
     attacker_utility: int = 0
 
     def as_tensors(self, shape_data: StateShapeData) -> StateTensorBatch:
-        # todo: use shapedata num features instead of calculating
         shape = State.get_shape(shape_data, batch_size=1)
         vulns_quant = torch.zeros(shape.vulnerabilities)
         vehicles_quant = torch.zeros(shape.vehicles)

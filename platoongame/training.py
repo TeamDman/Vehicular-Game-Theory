@@ -49,7 +49,8 @@ class WolpertingerDefenderAgentTrainer:
     tau:float = 0.001
     eps_start:float = 0.9
     eps_end:float = 0.05
-    eps_decay:float = 200
+    # eps_decay:float = 200
+    eps_decay:float = 10000
     target_update_interval:int = 10
     steps_done:int = 0
     device: torch.device = field(default_factory=lambda: torch.device("cpu"))
@@ -62,6 +63,7 @@ class WolpertingerDefenderAgentTrainer:
         self.memory = DequeReplayMemory(10000)
     
     def get_action(self, agent: WolpertingerDefenderAgent, state: State) -> DefenderAction:
+        # https://www.desmos.com/calculator/ylgxqq5rvd
         eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(-1. * self.steps_done / self.eps_decay)
         if random.random() > eps_threshold:
             return agent.get_action(state)
@@ -124,23 +126,18 @@ class WolpertingerDefenderAgentTrainer:
                 from_state = to_state
 
                 # optimize
+                loss = 0
                 if self.steps_done > warmup:
                     print("optimizing ", end="")
-                    self.optimize_policy(defender_agent)
+                    loss = self.optimize_policy(defender_agent)
 
                 # track stats
-                evaluator.track_stats()
+                evaluator.track_stats(loss)
                 self.steps_done += 1
                 print()
 
             # log stats before wiping
             stats_history.append(evaluator.stats)
-
-            # # Update the target network, copying all weights and biases in DQN
-            # # hard update
-            # # todo: soft update
-            # if episode % self.target_update_interval == 0:
-            #     defender_agent.target_net.load_state_dict(defender_agent.policy_net.state_dict())
 
         return stats_history
 
@@ -172,8 +169,8 @@ class WolpertingerDefenderAgentTrainer:
 
         action_batch = [v.action.as_tensor(shape_data) for v in batch]
         action_batch = DefenderActionTensorBatch(
-            members=torch.cat([v.members for v in action_batch]).unsqueeze(dim=1),
-            monitor=torch.cat([v.monitor for v in action_batch]).unsqueeze(dim=1),
+            members=torch.cat([v.members for v in action_batch]),
+            monitor=torch.cat([v.monitor for v in action_batch]),
         )
 
         assert action_batch.members.shape == (self.batch_size, 1, shape_data.num_vehicles)
@@ -221,6 +218,7 @@ class WolpertingerDefenderAgentTrainer:
         # get the loss for the predicted grades
         value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch)
         print(f"loss={value_loss}", end="")
+        
         # track the loss to model weights
         value_loss.backward()
         # apply model weight update
@@ -250,3 +248,5 @@ class WolpertingerDefenderAgentTrainer:
                 )
         soft_update(defender_agent.actor_target, defender_agent.actor, self.tau)
         soft_update(defender_agent.critic_target, defender_agent.critic, self.tau)
+
+        return float(value_loss.detach().numpy())

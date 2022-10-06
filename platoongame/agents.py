@@ -27,8 +27,8 @@ class DefenderAction:
         monitor[list(self.monitor)] = 1
 
         return DefenderActionTensorBatch(
-            members=members.unsqueeze(dim=0),
-            monitor=monitor.unsqueeze(dim=0),
+            members=members.unsqueeze(dim=0).unsqueeze(dim=1),
+            monitor=monitor.unsqueeze(dim=0).unsqueeze(dim=1),
         )
 
 
@@ -41,7 +41,7 @@ class AttackerAction:
         attack = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
         attack[list(self.attack)] = 1
         return AttackerActionTensorBatch(
-            attack=attack.unsqueeze(dim=0),
+            attack=attack.unsqueeze(dim=0).unsqueeze(dim=1),
         )
 
 
@@ -114,7 +114,9 @@ class DefenderAgent(Agent):
             vehicles[i] = replace(v, in_platoon = i in action.members)
             # self.logger.info(f"kicking vehicle {i} out of platoon")
             # self.logger.info(f"adding vehicle {i} to platoon")
-            
+        
+        self.logger.debug(f"platoon={action.members}")
+
         # update vehicles from mutated copy
         state = replace(state, vehicles=tuple(vehicles))
 

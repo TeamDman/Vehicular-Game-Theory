@@ -16,6 +16,7 @@ class Metrics:
     platoon_severity: int
     vehicles: int
     platoon_size: int
+    loss: float
 # todo: add new metrics
 # - Learning rate
 # - Risk of the platoon
@@ -47,7 +48,7 @@ class Evaluator:
         )
         self.track_stats()
 
-    def track_stats(self) -> None:
+    def track_stats(self, loss: float = 0) -> None:
         self.stats.append(Metrics(
             defender_util=self.game.state.defender_utility,
             attacker_util=self.game.state.attacker_utility,
@@ -58,6 +59,7 @@ class Evaluator:
             platoon_severity = sum([vuln.severity for vehicle in self.game.state.vehicles for vuln in vehicle.vulnerabilities if vehicle.in_platoon and vuln.state != CompromiseState.NOT_COMPROMISED]),
             platoon_size=len([1 for v in self.game.state.vehicles if v.in_platoon]),
             vehicles=len(self.game.state.vehicles),
+            loss=loss,
         ))
 
     def plot(self, stats: List[Metrics] = None):
@@ -66,7 +68,7 @@ class Evaluator:
         import numpy as np
         # fig, axs = plt.subplots(4, figsize=(16,9), gridspec_kw={'height_ratios': [1, 2, 1, 1]})
         # fig, axs = plt.subplots(5, figsize=(10,5), gridspec_kw={'height_ratios': [1, 1, 1, 1,1]})
-        fig, axs = plt.subplots(6, figsize=(8,10))
+        fig, axs = plt.subplots(7, figsize=(8,10))
         i=0
         axs[i].plot([x.defender_util for x in self.stats], label="defender")
         axs[i].plot([x.attacker_util for x in self.stats], label="attacker")
@@ -104,6 +106,11 @@ class Evaluator:
         axs[i].plot([x.platoon_size for x in self.stats],label="platoon size")
         axs[i].legend(loc="upper left")
         axs[i].title.set_text("membership")
+
+        i+=1
+        axs[i].plot([x.loss for x in self.stats],label="loss")
+        axs[i].legend(loc="upper left")
+        axs[i].title.set_text("loss")
 
         plt.tight_layout()
         plt.subplots_adjust(top=2)

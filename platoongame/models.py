@@ -166,5 +166,4 @@ class DefenderCritic(nn.Module):
         x = self.hidden2(x)
         x = F.relu(x)
         x = self.score(x)
-        x = F.tanh(x)
         return x.reshape(-1, actions_per_batch)
