@@ -107,13 +107,13 @@ class EpisodeMetricsTracker:
         plt.subplot(9, 2, 8)
         plt.plot([x.platoon_risk for x in self.stats],label="risk")
         plt.legend(loc="upper left")
-        plt.title("risk")
+        plt.title("platoon risk")
 
     def plot_average_platoon_risk(self) -> None:
         plt.subplot(9, 2, 9)
         plt.plot([x.average_platoon_risk for x in self.stats],label="avg risk")
         plt.legend(loc="upper left")
-        plt.title("average risk")
+        plt.title("average platoon risk")
 
     def plot_epsilon_threshold(self) -> None:
         plt.subplot(9, 2, 10)
