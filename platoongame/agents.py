@@ -10,6 +10,7 @@ from pprint import pprint
 from collections import deque
 from dataclasses import dataclass, replace
 from abc import ABC, abstractmethod
+import pathlib
 
 if TYPE_CHECKING:
     from game import Game, State
@@ -361,3 +362,19 @@ class WolpertingerDefenderAgent(DefenderAgent):
             members=propose(proto_actions.members),
             monitor=propose(proto_actions.monitor),
         )
+
+    def save(self, save_dir: str):
+        save_dir: pathlib.Path = pathlib.Path(save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        models = ["actor", "actor_target", "critic", "critic_target"]
+        for model in models:
+            save_path = save_dir / f"{model}.pt"
+            torch.save(getattr(self,model).state_dict(), save_path)
+
+    def load(self, load_dir: str):
+        load_dir = pathlib.Path(load_dir)
+        models = ["actor", "actor_target", "critic", "critic_target"]
+        for model in models:
+            path = load_dir / f"{model}.pt"
+            getattr(self,model).load_state_dict(torch.load(path, map_location=get_device()))
+        
