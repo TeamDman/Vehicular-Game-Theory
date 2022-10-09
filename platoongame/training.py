@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Union
 from warnings import warn
-from evaluation import Evaluator, Metrics
-from game import State, StateTensorBatch
+from metrics import EpisodeMetricsTracker, EpisodeMetricsEntry
+from game import Game, GameConfig, State, StateTensorBatch
 
 from memory import DequeReplayMemory, Transition
 import torch
@@ -13,7 +13,7 @@ from agents import Action, DefenderAction, DefenderActionTensorBatch, Wolperting
 import numpy as np
 from utils import get_device
 
-from vehicles import Vulnerability
+from vehicles import VehicleProvider, Vulnerability
 
 criterion = torch.nn.MSELoss()
 
@@ -36,57 +36,69 @@ class WolpertingerDefenderAgentTrainer:
         self.steps_done = 0
         self.memory = DequeReplayMemory(10000)
     
-    def get_action(self, agent: WolpertingerDefenderAgent, state: State) -> DefenderAction:
+    def get_epsilon_threshold(self) -> float:
         # https://www.desmos.com/calculator/ylgxqq5rvd
-        eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(-1. * self.steps_done / self.eps_decay)
-        if random.random() > eps_threshold:
+        return self.eps_end + (self.eps_start - self.eps_end) * math.exp(-1. * self.steps_done / self.eps_decay)
+ 
+    def get_action(self, agent: WolpertingerDefenderAgent, state: State) -> DefenderAction:
+        if random.random() > self.get_epsilon_threshold():
             return agent.get_action(state)
         else:
             return agent.get_random_action(state)
 
     def train(
         self,
+        game_config: GameConfig,
+        vehicle_provider: VehicleProvider,
         episodes: int,
         max_steps_per_episode: int,
         defender_agent: WolpertingerDefenderAgent,
         attacker_agent: Agent,
-        evaluator: Evaluator,
         warmup: int,
-    ) -> List[List[Metrics]]:
+        metrics_callback: lambda metrics: None = lambda metrics: (),
+    ) -> List[List[EpisodeMetricsEntry]]:
         if (warmup < self.batch_size):
             raise ValueError("warmup must be greater than batch size")
-        stats_history: List[List[Metrics]] = []
+        metrics_history: List[EpisodeMetricsTracker] = []
         for episode in range(episodes):
-            evaluator.reset()
-            evaluator.track_stats() # log starting positions
-            from_state = evaluator.game.state
+            metrics = EpisodeMetricsTracker()
+            game = Game(
+                config=game_config,
+                vehicle_provider=vehicle_provider
+            )
+            metrics.track_stats(
+                game=game,
+                loss=0,
+                epsilon_threshold=self.get_epsilon_threshold(),
+            ) # log starting positions
+            from_state = game.state
 
             for step in range(max_steps_per_episode):
                 print(f"episode {episode} step {step} ", end="")
                 #region manually invoke game loop
-                evaluator.game.logger.debug("stepping")
+                game.logger.debug("stepping")
 
-                evaluator.game.logger.debug(f"attacker turn begin")
-                action = attacker_agent.get_action(evaluator.game.state)
-                evaluator.game.state = attacker_agent.take_action(evaluator.game.state, action)
-                evaluator.game.logger.debug(f"attacker turn end")
+                game.logger.debug(f"attacker turn begin")
+                action = attacker_agent.get_action(game.state)
+                game.state = attacker_agent.take_action(game.state, action)
+                game.logger.debug(f"attacker turn end")
                 
-                evaluator.game.logger.debug(f"defender turn begin")
-                action = self.get_action(defender_agent, evaluator.game.state)
-                evaluator.game.state = defender_agent.take_action(evaluator.game.state, action)
-                evaluator.game.logger.debug(f"defender turn end")
+                game.logger.debug(f"defender turn begin")
+                action = self.get_action(defender_agent, game.state)
+                game.state = defender_agent.take_action(game.state, action)
+                game.logger.debug(f"defender turn end")
 
-                evaluator.game.cycle()
-                evaluator.game.step_count += 1
+                game.cycle()
+                game.step_count += 1
                 #endregion manually invoke game loop
                 
                 done = step == max_steps_per_episode - 1
 
                 # calculate reward
-                reward = 0 if done else defender_agent.get_utility(evaluator.game.state)
+                reward = 0 if done else defender_agent.get_utility(game.state)
 
                 # add to memory
-                to_state = None if done else evaluator.game.state
+                to_state = None if done else game.state
                 self.memory.push(Transition(
                     state=from_state,
                     next_state=to_state,
@@ -105,14 +117,20 @@ class WolpertingerDefenderAgentTrainer:
                     loss = self.optimize_policy(defender_agent)
 
                 # track stats
-                evaluator.track_stats(loss)
+                metrics.track_stats(
+                    game=game,
+                    loss=loss,
+                    epsilon_threshold=self.get_epsilon_threshold(),
+                )
                 self.steps_done += 1
                 print()
 
             # log stats before wiping
-            stats_history.append(evaluator.stats)
+            metrics_history.append(metrics)
+            # allow for tracking metrics while being able to cancel training
+            metrics_callback(metrics)
 
-        return stats_history
+        return metrics_history
 
     def optimize_policy(
         self,
