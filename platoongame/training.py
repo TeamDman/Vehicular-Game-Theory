@@ -190,6 +190,7 @@ class WolpertingerDefenderAgentTrainer:
         assert q_batch.shape == (self.batch_size, 1)
         # get the loss for the predicted grades
         value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch)
+        # print(f"loss={value_loss} predicted={q_batch.flatten()} target={target_q_batch}", end="")
         print(f"loss={value_loss}", end="")
         
         # track the loss to model weights

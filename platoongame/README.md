@@ -1,2 +1,11 @@
-# 1509.02971.pdf CONTINUOUS CONTROL WITH DEEP REINFORCEMENT LEARNING
+
+## SEE ALSO
+
+https://github.com/primetang/pyflann
+https://github.com/nikhil3456/Deep-Reinforcement-Learning-in-Large-Discrete-Action-Spaces
+https://github.com/ghliu/pytorch-ddpg
+
+## Notes to self
+
+1509.02971.pdf CONTINUOUS CONTROL WITH DEEP REINFORCEMENT LEARNING  
 p4. We create a copy of the actor and critic networks, Q′(s, a|θQ′) and μ′(s|θμ′) respectively, that are used for calculating the target values. The weights of these target networks are then updated by having them slowly track the learned networks: θ′ ← τ θ + (1 − τ )θ′ with τ  1. This means that the target values are constrained to change slowly, greatly improving the stability of learning. 

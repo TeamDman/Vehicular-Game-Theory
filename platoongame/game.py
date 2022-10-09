@@ -1,7 +1,7 @@
 from __future__ import annotations 
 from dataclasses import dataclass, replace
 from re import S
-from typing import FrozenSet, List, Tuple, TYPE_CHECKING
+from typing import FrozenSet, List, Tuple, TYPE_CHECKING, Union
 from models import StateTensorBatch, StateShapeData
 from utils import get_logger
 from vehicles import Vehicle, VehicleProvider, Vulnerability
@@ -44,7 +44,7 @@ class State:
 @dataclass
 class GameConfig:
     max_vehicles: int = 10
-    cycle_every: int = None
+    cycle_every: Union[int,None] = None
     cycle_num: int = None
     cycle_allow_platoon: bool = False
 
