@@ -22,7 +22,7 @@ import utils
 from vehicles import VehicleProvider, Vulnerability
 
 criterion = torch.nn.MSELoss()
-
+# PolicyUpdateType = Union["soft","hard"]
 @dataclass
 class WolpertingerDefenderAgentTrainerConfig:
     game_config: GameConfig
@@ -101,7 +101,7 @@ class WolpertingerDefenderAgentTrainer:
         if (config.warmup < self.batch_size):
             raise ValueError("warmup must be greater than batch size")
         self.track_run_start(config, save_dir="checkpoints")
-        config.defender_agent.save(save_dir="checkpoints")
+        config.defender_agent.save(dir="checkpoints")
 
         metrics_history: List[EpisodeMetricsTracker] = []
         i = 0
@@ -196,7 +196,7 @@ class WolpertingerDefenderAgentTrainer:
                 )
 
                 if i % config.checkpoint_interval == 0 and should_train:
-                    config.defender_agent.save(save_dir="checkpoints")
+                    config.defender_agent.save(dir="checkpoints")
                     print("checkpointed! ", end="")
 
 
@@ -286,9 +286,11 @@ class WolpertingerDefenderAgentTrainer:
         q_batch = defender_agent.critic(state_batch, action_batch)
         assert q_batch.shape == (self.batch_size, 1)
         # get the loss for the predicted grades
-        value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch).mean()
+        # value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch).mean() # todo: investigate
+        value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch)
         # print(f"loss={value_loss} predicted={q_batch.flatten()} target={target_q_batch}", end="")
-        print(f"loss={value_loss:.4f} ({value_loss / self.batch_size:.4f} , {(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
+        # print(f"loss={value_loss:.4f} ({value_loss / self.batch_size:.4f} , {(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
+        print(f"loss={value_loss:.4f} ({(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
         
         # track the loss to model weights
         value_loss.backward()
