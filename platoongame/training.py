@@ -138,7 +138,7 @@ class WolpertingerDefenderAgentTrainer:
                     if self.steps_done % update_policy_interval == 0:
                         defender_agent.actor_target.load_state_dict(defender_agent.actor.state_dict())
                         defender_agent.critic_target.load_state_dict(defender_agent.critic.state_dict())
-                        print("policy update!", end="")
+                        print("policy update! ", end="")
                         # target_net.load_state_dict(policy_net.state_dict())
 
                 # track stats
@@ -150,6 +150,7 @@ class WolpertingerDefenderAgentTrainer:
 
                 if i % checkpoint_interval == 0 and should_train:
                     defender_agent.save(save_dir="checkpoints")
+                    print("checkpointed! ", end="")
 
 
 
