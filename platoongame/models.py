@@ -52,9 +52,9 @@ class DefenderActor(nn.Module):
         self.vehicle_norm = nn.LazyBatchNorm1d()
 
         # self.hidden1 = nn.LazyLinear(out_features = 400)
-        self.hidden1 = nn.LazyLinear(out_features = 1000)
+        self.hidden1 = nn.LazyLinear(out_features = 3000)
         # self.hidden2 = nn.LazyLinear(out_features = 300)
-        self.hidden2 = nn.LazyLinear(out_features = 500)
+        self.hidden2 = nn.LazyLinear(out_features = 100)
 
         # probability vectors, each elem {i} represents probability of vehicle {i} being chosen
         self.member_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who should be in platoon
@@ -92,8 +92,10 @@ class DefenderActor(nn.Module):
         x = self.hidden2(x)
         x = F.relu(x)
 
-        members_proto = torch.arctan(self.member_head(x))
-        monitor_proto = torch.arctan(self.monitor_head(x))
+        # members_proto = torch.relu(self.member_head(x))   # todo: investigate
+        # monitor_proto = torch.relu(self.monitor_head(x))  # todo: investigate
+        members_proto = torch.sigmoid(self.member_head(x))
+        monitor_proto = torch.sigmoid(self.monitor_head(x))
 
         # convert from [state,action] to [state,0,action] (action sub-batches of size 1 for each state)
         members_proto = members_proto.unsqueeze(dim=1)
@@ -125,8 +127,8 @@ class DefenderCritic(nn.Module):
         self.vehicle_norm = nn.LazyBatchNorm1d()
 
 
-        self.hidden1 = nn.LazyLinear(out_features = 400)
-        self.hidden2 = nn.LazyLinear(out_features = 300)
+        self.hidden1 = nn.LazyLinear(out_features = 3000)
+        self.hidden2 = nn.LazyLinear(out_features = 1000)
         self.score = nn.LazyLinear(out_features = 1)
 
         # # probability vectors, each elem {i} represents probability of vehicle {i} being chosen

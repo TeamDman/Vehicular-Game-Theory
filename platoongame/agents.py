@@ -4,7 +4,7 @@ import logging
 import random
 from re import M
 import time
-from typing import Deque, List, Set, Union, FrozenSet, TYPE_CHECKING
+from typing import Deque, Dict, List, Set, Union, FrozenSet, TYPE_CHECKING
 from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
 from utils import get_logger, get_prefix
 from vehicles import CompromiseState, Vehicle
@@ -298,10 +298,11 @@ import torch
 import torch.optim
 
 class WolpertingerDefenderAgent(DefenderAgent):
-    def __init__(self, state_shape_data: StateShapeData, learning_rate: float) -> None:
+    def __init__(self, state_shape_data: StateShapeData, learning_rate: float, num_proposals: int) -> None:
         super().__init__(get_logger("WolpertingerDefenderAgent"))
         self.learning_rate = learning_rate
         self.state_shape_data = state_shape_data
+        self.num_proposals = num_proposals
 
         self.actor = DefenderActor(state_shape_data).to(get_device())
         self.actor_target = DefenderActor(state_shape_data).to(get_device())
@@ -353,6 +354,16 @@ class WolpertingerDefenderAgent(DefenderAgent):
             monitor=frozenset(actions.monitor[0][best].cpu().nonzero().flatten().numpy()),
         )
     
+    def get_config(self) -> Dict:
+        return {
+            "learning_rate": self.learning_rate,
+            "num_proposals": self.num_proposals,
+            "actor_hidden1_out_features": self.actor.hidden1.out_features,
+            "actor_hidden2_out_features": self.actor.hidden2.out_features,
+            "critic_hidden1_out_features": self.critic.hidden1.out_features,
+            "critic_hidden2_out_features": self.critic.hidden2.out_features,
+        }
+
     # Converts latent action into multiple potential actions
     def collapse_proto_actions(self, proto_actions: DefenderActionTensorBatch) -> DefenderActionTensorBatch:
         num_proposals = 5

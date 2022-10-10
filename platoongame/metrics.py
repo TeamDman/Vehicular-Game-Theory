@@ -39,7 +39,6 @@ class EpisodeMetricsEntry:
         path = path / f"{utils.get_prefix()} {step:06}.log.json"
         with open(path, "w") as f:
             json.dump(dataclasses.asdict(self), f)
-        # todo: write metrics history to disk
 
 
 @dataclass

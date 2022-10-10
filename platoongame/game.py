@@ -3,7 +3,7 @@ from dataclasses import dataclass, replace
 import dataclasses
 import json
 from re import S
-from typing import FrozenSet, List, Tuple, TYPE_CHECKING, Union
+from typing import Dict, FrozenSet, List, Tuple, TYPE_CHECKING, Union
 from models import StateTensorBatch, StateShapeData
 from utils import get_logger
 from vehicles import Vehicle, VehicleProvider, Vulnerability
@@ -50,8 +50,8 @@ class GameConfig:
     cycle_num: int = None
     cycle_allow_platoon: bool = False
 
-    def __str__(self) -> str:
-        return json.dumps(dataclasses.asdict(self))
+    def get_config(self) -> Dict:
+        return dataclasses.asdict(self)
 
 class Game:
     state: State

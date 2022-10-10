@@ -25,13 +25,14 @@ criterion = torch.nn.MSELoss()
 # PolicyUpdateType = Union["soft","hard"]
 @dataclass
 class WolpertingerDefenderAgentTrainerConfig:
+    batch_size:int
     game_config: GameConfig
     vehicle_provider: VehicleProvider
-    episodes: int
+    train_episodes: int
     max_steps_per_episode: int
     defender_agent: WolpertingerDefenderAgent
     attacker_agent: Agent
-    warmup: int
+    warmup_episodes: int
     update_policy_interval: int
     checkpoint_interval: int
     policy_update_type: str
@@ -39,14 +40,14 @@ class WolpertingerDefenderAgentTrainerConfig:
 
     def __str__(self) -> str:
         return json.dumps({
-            "learning_rate": self.defender_agent.learning_rate,
-            "game_config": str(self.game_config),
+            "game_config": self.game_config.get_config(),
             "vehicle_provider": self.vehicle_provider.__class__.__name__,
-            "episodes": self.episodes,
+            "train_episodes": self.train_episodes,
             "max_steps_per_episode": self.max_steps_per_episode,
             "defender_agent": str(self.defender_agent),
+            "defender_config": self.defender_agent.get_config(),
             "attacker_agent": str(self.attacker_agent),
-            "warmup": self.warmup,
+            "warmup_episodes": self.warmup_episodes,
             "update_policy_interval": self.update_policy_interval,
             "policy_update_type": self.policy_update_type,
             "checkpoint_interval": self.checkpoint_interval,
@@ -56,7 +57,6 @@ class WolpertingerDefenderAgentTrainerConfig:
 
 @dataclass
 class WolpertingerDefenderAgentTrainer:
-    batch_size:int = 128
     gamma:float = 0.99
     tau:float = 0.001
     eps_start:float = 0.9
@@ -98,14 +98,12 @@ class WolpertingerDefenderAgentTrainer:
         self,
         config: WolpertingerDefenderAgentTrainerConfig
     ) -> List[List[EpisodeMetricsEntry]]:
-        if (config.warmup < self.batch_size):
-            raise ValueError("warmup must be greater than batch size")
         self.track_run_start(config, save_dir="checkpoints")
         config.defender_agent.save(dir="checkpoints")
 
         metrics_history: List[EpisodeMetricsTracker] = []
         i = 0
-        for episode in range(config.episodes):
+        for episode in range(config.train_episodes + config.warmup_episodes):
             metrics = EpisodeMetricsTracker()
             game = Game(
                 config=config.game_config,
@@ -121,8 +119,6 @@ class WolpertingerDefenderAgentTrainer:
 
             for episode_step in range(config.max_steps_per_episode):
                 i += 1
-                now = time.strftime("%Y-%m-%d %H%M-%S")
-                print(f"{now} episode {episode} step {episode_step} ", end="")
 
                 #region manually invoke game loop
                 game.logger.debug("stepping")
@@ -162,10 +158,14 @@ class WolpertingerDefenderAgentTrainer:
                 # optimize
                 loss = 0
                 # todo: only perform training every {j} steps to allow for more newer memories in buffer
-                should_train = self.steps_done > config.warmup
+                should_train = self.steps_done > config.warmup_episodes and len(self.memory) >= config.batch_size
+                # if should_train or i % 200 == 0:
+                now = time.strftime("%Y-%m-%d %H%M-%S")
+                print(f"{now} episode {episode} step {episode_step} ", end="")
+
                 if should_train:
                     print("optimizing ", end="")
-                    loss = self.optimize_policy(config.defender_agent)
+                    loss = self.optimize_policy(config)
                     
                     # Soft update wasn't training fast, trying hard update
                     if self.steps_done % config.update_policy_interval == 0:
@@ -213,10 +213,10 @@ class WolpertingerDefenderAgentTrainer:
 
     def optimize_policy(
         self,
-        defender_agent: WolpertingerDefenderAgent,
+        config: WolpertingerDefenderAgentTrainerConfig,
     ) -> None:
-        batch = self.memory.sample(self.batch_size)
-        shape_data = defender_agent.state_shape_data
+        batch = self.memory.sample(config.batch_size)
+        shape_data = config.defender_agent.state_shape_data
             
         state_batch = [v.state.as_tensors(shape_data) for v in batch]
         state_batch = StateTensorBatch(
@@ -224,8 +224,8 @@ class WolpertingerDefenderAgentTrainer:
             vehicles=torch.cat([v.vehicles for v in state_batch]).to(get_device()),
         )
         
-        assert state_batch.vehicles.shape == (self.batch_size, shape_data.num_vehicles, shape_data.num_vehicle_features)
-        assert state_batch.vulnerabilities.shape == (self.batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)
+        assert state_batch.vehicles.shape == (config.batch_size, shape_data.num_vehicles, shape_data.num_vehicle_features)
+        assert state_batch.vulnerabilities.shape == (config.batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)
         assert state_batch.vehicles.shape[0] == state_batch.vulnerabilities.shape[0]
 
         action_batch = [v.action.as_tensor(shape_data) for v in batch]
@@ -234,8 +234,8 @@ class WolpertingerDefenderAgentTrainer:
             monitor=torch.cat([v.monitor for v in action_batch]).to(get_device()),
         )
 
-        assert action_batch.members.shape == (self.batch_size, 1, shape_data.num_vehicles)
-        assert action_batch.monitor.shape == (self.batch_size, 1, shape_data.num_vehicles)
+        assert action_batch.members.shape == (config.batch_size, 1, shape_data.num_vehicles)
+        assert action_batch.monitor.shape == (config.batch_size, 1, shape_data.num_vehicles)
 
         # get the batch of next states for calculating q
         def coalesce_next_state(transition: Transition) -> StateTensorBatch:
@@ -259,16 +259,16 @@ class WolpertingerDefenderAgentTrainer:
         with torch.no_grad():
             # get proto actions for the next states
             # should return [batch_size, 1, num_vehicles] tensors for members and monitor
-            proto_actions:DefenderActionTensorBatch = defender_agent.actor_target(next_state_batch)
-            assert proto_actions.members.shape == proto_actions.monitor.shape == (self.batch_size, 1, shape_data.num_vehicles)
+            proto_actions:DefenderActionTensorBatch = config.defender_agent.actor_target(next_state_batch)
+            assert proto_actions.members.shape == proto_actions.monitor.shape == (config.batch_size, 1, shape_data.num_vehicles)
 
             # get the evaluation of the proto actions in their state
-            next_q_values = defender_agent.critic_target(
+            next_q_values = config.defender_agent.critic_target(
                 next_state_batch,
                 proto_actions,
             )
             # for each batch (which has 1 proto action), there should be 1 q value
-            assert next_q_values.shape == (self.batch_size, 1)
+            assert next_q_values.shape == (config.batch_size, 1)
 
             # boolean vector indicating states that aren't terminal
             non_terminal_states = [not v.terminal for v in batch]
@@ -277,39 +277,39 @@ class WolpertingerDefenderAgentTrainer:
             target_q_batch = torch.as_tensor([v.reward for v in batch], dtype=torch.float32).to(get_device())
             # target q is increased by discounted predicted future reward
             target_q_batch[non_terminal_states] += self.gamma * next_q_values[non_terminal_states].flatten()
-            assert target_q_batch.shape == (self.batch_size,)
+            assert target_q_batch.shape == (config.batch_size,)
 
         #region critic update
         # reset the gradients
-        defender_agent.critic.zero_grad()
+        config.defender_agent.critic.zero_grad()
         # predict/grade the proposed actions
-        q_batch = defender_agent.critic(state_batch, action_batch)
-        assert q_batch.shape == (self.batch_size, 1)
+        q_batch = config.defender_agent.critic(state_batch, action_batch)
+        assert q_batch.shape == (config.batch_size, 1)
         # get the loss for the predicted grades
         # value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch).mean() # todo: investigate
         value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch)
         # print(f"loss={value_loss} predicted={q_batch.flatten()} target={target_q_batch}", end="")
-        # print(f"loss={value_loss:.4f} ({value_loss / self.batch_size:.4f} , {(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
+        # print(f"loss={value_loss:.4f} ({value_loss / config.batch_size:.4f} , {(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
         print(f"loss={value_loss:.4f} ({(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
         
         # track the loss to model weights
         value_loss.backward()
         # apply model weight update
-        defender_agent.critic_optimizer.step()
+        config.defender_agent.critic_optimizer.step()
         #endregion critic update
 
         #region actor update
         # reset the gradients
-        defender_agent.actor.zero_grad()
+        config.defender_agent.actor.zero_grad()
         # get proposed actions from actor, then get the critic to grade them
         # loss goes down as the critic makes better assessments of the proposed actions
-        policy_loss: torch.Tensor = -1 * defender_agent.critic(state_batch, defender_agent.actor(state_batch))
+        policy_loss: torch.Tensor = -1 * config.defender_agent.critic(state_batch, config.defender_agent.actor(state_batch))
         # ensure the actor proposes mostly good (according to the critic) actions
         policy_loss = policy_loss.mean()
         # back propagate the loss to the model weights
         policy_loss.backward()
         # apply model weight update
-        defender_agent.actor_optimizer.step()
+        config.defender_agent.actor_optimizer.step()
         #endregion actor update
 
         return float(value_loss.detach().cpu().numpy())
