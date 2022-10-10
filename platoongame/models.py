@@ -51,8 +51,10 @@ class DefenderActor(nn.Module):
         # )
         self.vehicle_norm = nn.LazyBatchNorm1d()
 
-        self.hidden1 = nn.LazyLinear(out_features = 400)
-        self.hidden2 = nn.LazyLinear(out_features = 300)
+        # self.hidden1 = nn.LazyLinear(out_features = 400)
+        self.hidden1 = nn.LazyLinear(out_features = 1000)
+        # self.hidden2 = nn.LazyLinear(out_features = 300)
+        self.hidden2 = nn.LazyLinear(out_features = 500)
 
         # probability vectors, each elem {i} represents probability of vehicle {i} being chosen
         self.member_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who should be in platoon
