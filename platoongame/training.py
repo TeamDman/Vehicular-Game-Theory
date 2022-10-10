@@ -132,6 +132,7 @@ class WolpertingerDefenderAgentTrainer:
                     if self.steps_done % update_policy_interval == 0:
                         defender_agent.actor_target.load_state_dict(defender_agent.actor.state_dict())
                         defender_agent.critic_target.load_state_dict(defender_agent.critic.state_dict())
+                        print("policy update!", end="")
                         # target_net.load_state_dict(policy_net.state_dict())
 
                 # track stats
@@ -227,7 +228,7 @@ class WolpertingerDefenderAgentTrainer:
         # get the loss for the predicted grades
         value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch).mean()
         # print(f"loss={value_loss} predicted={q_batch.flatten()} target={target_q_batch}", end="")
-        print(f"loss={value_loss:.4f} ({value_loss / self.batch_size:.4f} , {(q_batch.flatten() - target_q_batch).abs().max():.4f})", end="")
+        print(f"loss={value_loss:.4f} ({value_loss / self.batch_size:.4f} , {(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
         
         # track the loss to model weights
         value_loss.backward()
