@@ -148,7 +148,7 @@ class WolpertingerDefenderAgentTrainer:
                     epsilon_threshold=self.get_epsilon_threshold(),
                 )
 
-                if i % checkpoint_interval == 0:
+                if i % checkpoint_interval == 0 and should_train:
                     defender_agent.save(save_dir="checkpoints")
 
 
