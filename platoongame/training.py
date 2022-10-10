@@ -290,7 +290,8 @@ class WolpertingerDefenderAgentTrainer:
         value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch)
         # print(f"loss={value_loss} predicted={q_batch.flatten()} target={target_q_batch}", end="")
         # print(f"loss={value_loss:.4f} ({value_loss / config.batch_size:.4f} , {(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
-        print(f"loss={value_loss:.4f} ({(q_batch.flatten() - target_q_batch).abs().max():.4f}) ", end="")
+        diff = (q_batch.flatten() - target_q_batch).abs()
+        print(f"value_loss={value_loss:.4f} diff={{max={diff.max():.4f}, min={diff.min():.4f}, mean={diff.mean():.4f}}} ", end="")
         
         # track the loss to model weights
         value_loss.backward()
@@ -306,6 +307,7 @@ class WolpertingerDefenderAgentTrainer:
         policy_loss: torch.Tensor = -1 * config.defender_agent.critic(state_batch, config.defender_agent.actor(state_batch))
         # ensure the actor proposes mostly good (according to the critic) actions
         policy_loss = policy_loss.mean()
+        print(f"policy_loss={policy_loss:.4f} ", end="")
         # back propagate the loss to the model weights
         policy_loss.backward()
         # apply model weight update
