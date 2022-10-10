@@ -354,7 +354,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
             monitor=frozenset(actions.monitor[0][best].cpu().nonzero().flatten().numpy()),
         )
     
-    def get_config(self) -> Dict:
+    def as_dict(self) -> Dict:
         return {
             "learning_rate": self.learning_rate,
             "num_proposals": self.num_proposals,
@@ -396,8 +396,8 @@ class WolpertingerDefenderAgent(DefenderAgent):
             path = dir / f"{prefix} {model}.pt"
             getattr(self,model).load_state_dict(torch.load(path, map_location=get_device()))
     
-    def __str__(self) -> str:
-        return json.dumps({
+    def as_dict(self) -> str:
+        return {
             "name": self.__class__.__name__,
             "learning_rate": self.learning_rate,
-        })
+        }

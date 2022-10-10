@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
+import dataclasses
 from enum import Enum
 import pathlib
 import time
-from typing import List, Union
+from typing import Dict, List, Union
 from warnings import warn
-from metrics import EpisodeMetricsTracker, EpisodeMetricsEntry
+from metrics import EpisodeMetricsTracker, EpisodeMetricsEntry, OptimizationTracker
 from game import Game, GameConfig, State, StateTensorBatch
 
 from memory import DequeReplayMemory, Transition
@@ -36,25 +37,25 @@ class WolpertingerDefenderAgentTrainerConfig:
     attacker_agent: Agent
     update_policy_interval: int
     train_interval: int
-    checkpoint_interval: int
+    checkpoint_interval: Union[int, None]
     policy_update_type: str
     metrics_callback: lambda metrics: None = lambda metrics: ()
 
-    def __str__(self) -> str:
-        return json.dumps({
-            "game_config": self.game_config.get_config(),
+    def as_dict(self) -> Dict: 
+        return {
+            "game_config": self.game_config.as_dict(),
             "vehicle_provider": self.vehicle_provider.__class__.__name__,
             "train_steps": self.train_steps,
             "warmup_steps": self.warmup_steps,
             "max_steps_per_episode": self.max_steps_per_episode,
             "defender_agent": str(self.defender_agent),
-            "defender_config": self.defender_agent.get_config(),
+            "defender_config": self.defender_agent.as_dict(),
             "attacker_agent": str(self.attacker_agent),
             "update_policy_interval": self.update_policy_interval,
             "policy_update_type": self.policy_update_type,
             "checkpoint_interval": self.checkpoint_interval,
             # "metrics_callback": None,
-        })
+        }
 
 @dataclass
 class OptimizationResult:
@@ -81,6 +82,7 @@ class WolpertingerDefenderAgentTrainer:
     game: Game
     prev_state: State
     metrics_history: List[EpisodeMetricsTracker]
+    optimization_metrics: OptimizationTracker
     step: int
     optim_step: int
     episode: int
@@ -108,19 +110,14 @@ class WolpertingerDefenderAgentTrainer:
         path.mkdir(parents=True, exist_ok=True)
         path = path / f"{utils.get_prefix()} config.json"
         with open(path, "w") as f:
-            json.dump(str(config), f)
+            json.dump(config.as_dict(), f, indent=4)
 
     def prepare_next_episode(self) -> None:
         self.current_episode_metrics = EpisodeMetricsTracker()
         self.game = Game(config=self.config.game_config, vehicle_provider=self.config.vehicle_provider)
         self.prev_state = self.game.state
         self.episode_step = 0
-        self.current_episode_metrics.track_stats(
-                game=self.game,
-                optimization_results=OptimizationResult.default(),
-                epsilon_threshold=self.get_epsilon_threshold(),
-                step=self.step,
-        )
+        self.current_episode_metrics.track_stats(trainer=self)
         self.episode += 1
 
     def explore_step(self) -> None:
@@ -152,17 +149,13 @@ class WolpertingerDefenderAgentTrainer:
 
         print("optimizing ", end="")
         optim = self.optimize_policy()
-        print(f"loss={optim.loss:.4f} diff={{max={optim.diff_max:.4f}, min={optim.diff_min:.4f}, mean={optim.diff_mean:.4f}}} policy_loss={optim.policy_loss} ", end="")
+        print(f"loss={optim.loss:.4f} diff={{max={optim.diff_max:.4f}, min={optim.diff_min:.4f}, mean={optim.diff_mean:.4f}}} policy_loss={optim.policy_loss:.4f} ", end="")
         if optim.policy_updated:
             print("policy updated! ", end="")
-        self.current_episode_metrics.track_stats(
-            game=self.game,
-            optimization_results=optim,
-            epsilon_threshold=self.get_epsilon_threshold(),
-            step=self.step,
-        )
+        self.current_episode_metrics.track_stats(trainer=self)
+        self.optimization_metrics.track_stats(optim)
 
-        should_checkpoint = self.step % self.config.checkpoint_interval == 0
+        should_checkpoint = self.config.checkpoint_interval is not None and self.optim_step % self.config.checkpoint_interval == 0 and self.optim_step > 0
         if should_checkpoint:
             self.config.defender_agent.save(dir="checkpoints")
             print("checkpointed! ", end="")
@@ -181,8 +174,8 @@ class WolpertingerDefenderAgentTrainer:
         self.episode = 0
         self.optim_step = 0
         self.step = 0
+        self.optimization_metrics = OptimizationTracker()
         self.track_run_start(self.config, save_dir="checkpoints")
-        self.config.defender_agent.save(dir="checkpoints")
         self.memory = DequeReplayMemory(10000)
         self.prepare_next_episode()
 
@@ -293,7 +286,7 @@ class WolpertingerDefenderAgentTrainer:
         #endregion actor update
 
         # Soft update wasn't training fast, trying hard update
-        should_update_policy = self.step % self.config.update_policy_interval == 0
+        should_update_policy = self.optim_step % self.config.update_policy_interval == 0
         if should_update_policy:
             if self.config.policy_update_type == "soft":
                 # from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26

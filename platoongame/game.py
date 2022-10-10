@@ -50,7 +50,7 @@ class GameConfig:
     cycle_num: int = None
     cycle_allow_platoon: bool = False
 
-    def get_config(self) -> Dict:
+    def as_dict(self) -> Dict:
         return dataclasses.asdict(self)
 
 class Game:

@@ -14,7 +14,7 @@ import numpy as np
 import utils
 
 if TYPE_CHECKING:
-    from training import WolpertingerDefenderAgentTrainerConfig, OptimizationResult
+    from training import WolpertingerDefenderAgentTrainer, OptimizationResult
 
 @dataclass
 class EpisodeMetricsEntry:
@@ -31,7 +31,6 @@ class EpisodeMetricsEntry:
     epsilon_threshold: float
     platoon_risk: float
     average_platoon_risk: float
-    optim: OptimizationResult
 
     def save(self, dir: str, step: int):
         path = pathlib.Path(dir)
@@ -43,18 +42,21 @@ class EpisodeMetricsEntry:
 
 
 
+@dataclass
+class OptimizationTracker:
+    stats: List[OptimizationResult] = field(default_factory=list)
+    def track_stats(
+        self,
+        optimization_results: OptimizationResult,
+    ) -> None:
+        self.stats.append(optimization_results)
 
 @dataclass
 class EpisodeMetricsTracker:
     stats: List[EpisodeMetricsEntry] = field(default_factory=list)
 
-    def track_stats(
-        self,
-        game: Game,
-        optimization_results: OptimizationResult,
-        step: int,
-        epsilon_threshold: float,
-    ) -> None:
+    def track_stats(self, trainer: WolpertingerDefenderAgentTrainer) -> None:
+        game = trainer.game
         platoon_members = [v for v in game.state.vehicles if v.in_platoon]
         entry = EpisodeMetricsEntry(
             defender_util=game.state.defender_utility,
@@ -69,11 +71,10 @@ class EpisodeMetricsTracker:
             vehicles=len(game.state.vehicles),
             platoon_risk=sum([v.risk for v in platoon_members]),
             average_platoon_risk=0 if len(platoon_members) == 0 else mean([v.risk for v in platoon_members]),
-            optim=optimization_results,
-            epsilon_threshold=epsilon_threshold,
+            epsilon_threshold=trainer.get_epsilon_threshold(),
         )
         self.stats.append(entry)
-        entry.save(dir="logs", step=step)
+        # entry.save(dir="logs", step=step)
 
     def plot_utilities(self) -> None:
         plt.subplot(9, 2, 1)
