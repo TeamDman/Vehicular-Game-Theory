@@ -1,11 +1,12 @@
 from __future__ import annotations
+import json
 import logging
 import random
 from re import M
 import time
 from typing import Deque, List, Set, Union, FrozenSet, TYPE_CHECKING
 from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
-from utils import get_logger
+from utils import get_logger, prefix
 from vehicles import CompromiseState, Vehicle
 from pprint import pprint
 from collections import deque
@@ -90,6 +91,9 @@ class PassiveAgent(Agent):
 
     def get_utility(self, state: State) -> int:
         return 0
+
+    def __str__(self) -> str:
+        return self.__class__.__name__
 
 class DefenderAgent(Agent):
     def get_utility(self, state: State) -> int:
@@ -294,18 +298,18 @@ import torch
 import torch.optim
 
 class WolpertingerDefenderAgent(DefenderAgent):
-    def __init__(self, state_shape_data: StateShapeData) -> None:
+    def __init__(self, state_shape_data: StateShapeData, learning_rate: float) -> None:
         super().__init__(get_logger("WolpertingerDefenderAgent"))
-
+        self.learning_rate = learning_rate
         self.state_shape_data = state_shape_data
 
         self.actor = DefenderActor(state_shape_data).to(get_device())
         self.actor_target = DefenderActor(state_shape_data).to(get_device())
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=0.0005)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate)
 
         self.critic = DefenderCritic().to(get_device())
         self.critic_target = DefenderCritic().to(get_device())
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=0.0005)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=learning_rate)
 
         # hard update
         self.actor_target.load_state_dict(self.actor.state_dict())
@@ -368,7 +372,6 @@ class WolpertingerDefenderAgent(DefenderAgent):
         save_dir: pathlib.Path = pathlib.Path(save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
         models = ["actor", "actor_target", "critic", "critic_target"]
-        prefix = time.strftime("%Y-%m-%d %H%M-%S")
         for model in models:
             save_path = save_dir / f"{prefix} {model}.pt"
             torch.save(getattr(self,model).state_dict(), save_path)
@@ -379,4 +382,9 @@ class WolpertingerDefenderAgent(DefenderAgent):
         for model in models:
             path = load_dir / f"{load_prefix} {model}.pt"
             getattr(self,model).load_state_dict(torch.load(path, map_location=get_device()))
-        
+    
+    def __str__(self) -> str:
+        return json.dumps({
+            "name": self.__class__.__name__,
+            "learning_rate": self.learning_rate,
+        })

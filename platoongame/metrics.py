@@ -1,4 +1,7 @@
+from __future__ import annotations
 from dataclasses import dataclass, field, _MISSING_TYPE
+import json
+import pathlib
 from statistics import mean
 from agents import Agent
 from game import Game, GameConfig
@@ -7,6 +10,10 @@ from vehicles import CompromiseState, VehicleProvider, Vulnerability
 from typing import *
 import matplotlib.pyplot as plt
 import numpy as np
+import utils
+
+if TYPE_CHECKING:
+    from training import WolpertingerDefenderAgentTrainerConfig
 
 @dataclass
 class EpisodeMetricsEntry:
@@ -24,6 +31,7 @@ class EpisodeMetricsEntry:
     epsilon_threshold: float
     platoon_risk: float
     average_platoon_risk: float
+
 # todo: add new metrics
 # - Learning rate
 # - Risk of the platoon
@@ -31,6 +39,7 @@ class EpisodeMetricsEntry:
 @dataclass
 class EpisodeMetricsTracker:
     stats: List[EpisodeMetricsEntry] = field(default_factory=list)
+
     def track_stats(
         self,
         game: Game,

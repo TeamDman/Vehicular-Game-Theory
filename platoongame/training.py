@@ -12,12 +12,44 @@ import random
 import math
 from agents import Action, DefenderAction, DefenderActionTensorBatch, WolpertingerDefenderAgent, Agent
 
+import json 
+
 import numpy as np
 from utils import get_device
+import utils
 
 from vehicles import VehicleProvider, Vulnerability
 
 criterion = torch.nn.MSELoss()
+
+@dataclass
+class WolpertingerDefenderAgentTrainerConfig:
+    game_config: GameConfig
+    vehicle_provider: VehicleProvider
+    episodes: int
+    max_steps_per_episode: int
+    defender_agent: WolpertingerDefenderAgent
+    attacker_agent: Agent
+    warmup: int
+    update_policy_interval: int
+    checkpoint_interval: int
+    metrics_callback: lambda metrics: None = lambda metrics: ()
+
+    def __str__(self) -> str:
+        return json.dumps({
+            "learning_rate": self.defender_agent.learning_rate,
+            "game_config": str(self.game_config),
+            "vehicle_provider": self.vehicle_provider.__class__.__name__,
+            "episodes": self.episodes,
+            "max_steps_per_episode": self.max_steps_per_episode,
+            "defender_agent": str(self.defender_agent),
+            "attacker_agent": str(self.attacker_agent),
+            "warmup": self.warmup,
+            "update_policy_interval": self.update_policy_interval,
+            "checkpoint_interval": self.checkpoint_interval,
+            # "metrics_callback": None,
+        })
+        
 
 @dataclass
 class WolpertingerDefenderAgentTrainer:
@@ -48,28 +80,31 @@ class WolpertingerDefenderAgentTrainer:
         else:
             return agent.get_random_action(state)
 
+    def track_run_start(
+        self,
+        config: WolpertingerDefenderAgentTrainerConfig,
+        save_dir: str,
+    ):
+        path = pathlib.Path(save_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        path = path / f"{utils.prefix} config.json"
+        with open(path, "w") as f:
+            json.dump(str(config), f)
+
     def train(
         self,
-        game_config: GameConfig,
-        vehicle_provider: VehicleProvider,
-        episodes: int,
-        max_steps_per_episode: int,
-        defender_agent: WolpertingerDefenderAgent,
-        attacker_agent: Agent,
-        warmup: int,
-        update_policy_interval: int,
-        checkpoint_interval: int,
-        metrics_callback: lambda metrics: None = lambda metrics: (),
+        config: WolpertingerDefenderAgentTrainerConfig
     ) -> List[List[EpisodeMetricsEntry]]:
-        if (warmup < self.batch_size):
+        if (config.warmup < self.batch_size):
             raise ValueError("warmup must be greater than batch size")
+        self.track_run_start(config, save_dir="checkpoints")
         metrics_history: List[EpisodeMetricsTracker] = []
         i = 0
-        for episode in range(episodes):
+        for episode in range(config.episodes):
             metrics = EpisodeMetricsTracker()
             game = Game(
-                config=game_config,
-                vehicle_provider=vehicle_provider
+                config=config.game_config,
+                vehicle_provider=config.vehicle_provider
             )
             metrics.track_stats(
                 game=game,
@@ -78,32 +113,32 @@ class WolpertingerDefenderAgentTrainer:
             ) # log starting positions
             from_state = game.state
 
-            for episode_step in range(max_steps_per_episode):
+            for episode_step in range(config.max_steps_per_episode):
                 i += 1
                 now = time.strftime("%Y-%m-%d %H%M-%S")
                 print(f"{now} episode {episode} step {episode_step} ", end="")
-                
+
                 #region manually invoke game loop
                 game.logger.debug("stepping")
 
                 game.logger.debug(f"attacker turn begin")
-                action = attacker_agent.get_action(game.state)
-                game.state = attacker_agent.take_action(game.state, action)
+                action = config.attacker_agent.get_action(game.state)
+                game.state = config.attacker_agent.take_action(game.state, action)
                 game.logger.debug(f"attacker turn end")
                 
                 game.logger.debug(f"defender turn begin")
-                action = self.get_action(defender_agent, game.state)
-                game.state = defender_agent.take_action(game.state, action)
+                action = self.get_action(config.defender_agent, game.state)
+                game.state = config.defender_agent.take_action(game.state, action)
                 game.logger.debug(f"defender turn end")
 
                 game.cycle()
                 game.step_count += 1
                 #endregion manually invoke game loop
                 
-                done = episode_step == max_steps_per_episode - 1
+                done = episode_step == config.max_steps_per_episode - 1
 
                 # calculate reward
-                reward = 0 if done else defender_agent.get_utility(game.state)
+                reward = 0 if done else config.defender_agent.get_utility(game.state)
 
                 # add to memory
                 to_state = None if done else game.state
@@ -121,10 +156,10 @@ class WolpertingerDefenderAgentTrainer:
                 # optimize
                 loss = 0
                 # todo: only perform training every {j} steps to allow for more newer memories in buffer
-                should_train = self.steps_done > warmup
+                should_train = self.steps_done > config.warmup
                 if should_train:
                     print("optimizing ", end="")
-                    loss = self.optimize_policy(defender_agent)
+                    loss = self.optimize_policy(config.defender_agent)
                     
 
                     #region target update
@@ -138,9 +173,9 @@ class WolpertingerDefenderAgentTrainer:
                     # soft_update(defender_agent.critic_target, defender_agent.critic, self.tau)
 
                     # Soft update wasn't training fast, trying hard update
-                    if self.steps_done % update_policy_interval == 0:
-                        defender_agent.actor_target.load_state_dict(defender_agent.actor.state_dict())
-                        defender_agent.critic_target.load_state_dict(defender_agent.critic.state_dict())
+                    if self.steps_done % config.update_policy_interval == 0:
+                        config._agent.actor_target.load_state_dict(config._agent.actor.state_dict())
+                        config._agent.critic_target.load_state_dict(config._agent.critic.state_dict())
                         print("policy update! ", end="")
                         # target_net.load_state_dict(policy_net.state_dict())
 
@@ -151,8 +186,8 @@ class WolpertingerDefenderAgentTrainer:
                     epsilon_threshold=self.get_epsilon_threshold(),
                 )
 
-                if i % checkpoint_interval == 0 and should_train:
-                    defender_agent.save(save_dir="checkpoints")
+                if i % config.checkpoint_interval == 0 and should_train:
+                    config._agent.save(save_dir="checkpoints")
                     print("checkpointed! ", end="")
 
 
@@ -163,7 +198,7 @@ class WolpertingerDefenderAgentTrainer:
             # log stats before wiping
             metrics_history.append(metrics)
             # allow for tracking metrics while being able to cancel training
-            metrics_callback(metrics)
+            config.metrics_callback(metrics)
 
         return metrics_history
 

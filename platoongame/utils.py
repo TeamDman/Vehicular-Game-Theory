@@ -4,6 +4,7 @@
 
 import logging
 import sys
+import time
 
 level = logging.WARN
 # level = logging.DEBUG
@@ -20,6 +21,8 @@ def get_logger(name: str) -> logging.Logger:
     logger.setLevel(level)
     logger.addHandler(handler)
     return logger
+
+prefix = time.strftime("%Y-%m-%d %H%M-%S")
 
 ##################
 # DATA CLASSES

@@ -1,5 +1,7 @@
 from __future__ import annotations 
 from dataclasses import dataclass, replace
+import dataclasses
+import json
 from re import S
 from typing import FrozenSet, List, Tuple, TYPE_CHECKING, Union
 from models import StateTensorBatch, StateShapeData
@@ -47,6 +49,9 @@ class GameConfig:
     cycle_every: Union[int,None] = None
     cycle_num: int = None
     cycle_allow_platoon: bool = False
+
+    def __str__(self) -> str:
+        return json.dumps(dataclasses.asdict(self))
 
 class Game:
     state: State
