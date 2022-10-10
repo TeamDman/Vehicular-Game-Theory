@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import pathlib
 from typing import List, Union
 from warnings import warn
 from metrics import EpisodeMetricsTracker, EpisodeMetricsEntry
@@ -56,11 +57,13 @@ class WolpertingerDefenderAgentTrainer:
         attacker_agent: Agent,
         warmup: int,
         update_policy_interval: int,
+        checkpoint_interval: int,
         metrics_callback: lambda metrics: None = lambda metrics: (),
     ) -> List[List[EpisodeMetricsEntry]]:
         if (warmup < self.batch_size):
             raise ValueError("warmup must be greater than batch size")
         metrics_history: List[EpisodeMetricsTracker] = []
+        i = 0
         for episode in range(episodes):
             metrics = EpisodeMetricsTracker()
             game = Game(
@@ -75,6 +78,7 @@ class WolpertingerDefenderAgentTrainer:
             from_state = game.state
 
             for episode_step in range(max_steps_per_episode):
+                i += 1
                 print(f"episode {episode} step {episode_step} ", end="")
                 #region manually invoke game loop
                 game.logger.debug("stepping")
@@ -113,7 +117,9 @@ class WolpertingerDefenderAgentTrainer:
 
                 # optimize
                 loss = 0
-                if self.steps_done > warmup:
+                # todo: only perform training every {j} steps to allow for more newer memories in buffer
+                should_train = self.steps_done > warmup
+                if should_train:
                     print("optimizing ", end="")
                     loss = self.optimize_policy(defender_agent)
                     
@@ -141,6 +147,12 @@ class WolpertingerDefenderAgentTrainer:
                     loss=loss,
                     epsilon_threshold=self.get_epsilon_threshold(),
                 )
+
+                if i % checkpoint_interval == 0:
+                    defender_agent.save(save_dir="checkpoints")
+
+
+
                 self.steps_done += 1
                 print()
 
