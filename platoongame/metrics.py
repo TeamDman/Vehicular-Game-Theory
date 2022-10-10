@@ -150,3 +150,7 @@ class EpisodeMetricsTracker:
         self.plot_platoon_risk()
         self.plot_average_platoon_risk()
         self.plot_epsilon_threshold()
+
+    def save(self):
+        pass
+        # todo: write metrics history to disk
