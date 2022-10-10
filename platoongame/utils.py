@@ -2,9 +2,8 @@
 # LOGGING
 ##################
 
+import datetime
 import logging
-import sys
-import time
 
 level = logging.WARN
 # level = logging.DEBUG
@@ -23,7 +22,7 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 def get_prefix() -> str:
-    return time.strftime("%Y-%m-%d %H%M-%S")
+    return datetime.now().strftime("%Y-%m-%d %H%M-%S %f")
 
 ##################
 # DATA CLASSES
