@@ -57,12 +57,12 @@ class Game:
     state: State
     vehicle_provider: VehicleProvider
     logger: logging.Logger
-    step_count: int
+    step: int
     config: GameConfig
     def __init__(self, config: GameConfig, vehicle_provider: VehicleProvider) -> None:
         self.vehicle_provider = vehicle_provider
         self.logger = get_logger("Game")
-        self.step_count = 0
+        self.step = 0
         self.config = config
         self.reset()
 
@@ -71,29 +71,31 @@ class Game:
         self.vehicle_provider.reset()
         self.state = State(vehicles=tuple([self.vehicle_provider.next() for _ in range(self.config.max_vehicles)]))
 
-    def step(
+    def take_step(
         self,
         attacker_agent: Agent,
         defender_agent: Agent
     ) -> None:
         self.logger.debug("stepping")
         self.logger.debug(f"attacker turn begin")
-        action = attacker_agent.get_action(self.state)
-        self.state = attacker_agent.take_action(self.state, action)
+        attacker_action = attacker_agent.get_action(self.state)
+        self.state = attacker_agent.take_action(self.state, attacker_action)
         self.logger.debug(f"attacker turn end")
         
         self.logger.debug(f"defender turn begin")
-        action = defender_agent.get_action(self.state)
-        self.state = defender_agent.take_action(self.state, action)
+        defender_action = defender_agent.get_action(self.state)
+        self.state = defender_agent.take_action(self.state, defender_action)
         self.logger.debug(f"defender turn end")
         
         self.cycle()
 
-        self.step_count += 1
+        self.step += 1
+
+        return attacker_action, defender_action
 
     def cycle(self) -> None:
         # if self.step_count % 3 == 0 and len(self.vehicles) < self.config.max_vehicles:
-        if self.config.cycle_every is not None and self.step_count % self.config.cycle_every == 0:
+        if self.config.cycle_every is not None and self.step % self.config.cycle_every == 0:
             remove = set()
             candidates = list([(i,v) for i,v in enumerate(self.state.vehicles) if not v.in_platoon or self.config.cycle_allow_platoon])
             self.logger.info(f"cycling out {len(candidates)} of {self.config.cycle_num} allowed vehicles")

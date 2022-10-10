@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import random
 from typing import List, Union
 from agents import Action
-from game import State
+from game import Game, State
 
 @dataclass(frozen=True)
 class Transition:

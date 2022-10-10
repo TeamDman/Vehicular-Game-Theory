@@ -14,7 +14,7 @@ import numpy as np
 import utils
 
 if TYPE_CHECKING:
-    from training import WolpertingerDefenderAgentTrainerConfig
+    from training import WolpertingerDefenderAgentTrainerConfig, OptimizationResult
 
 @dataclass
 class EpisodeMetricsEntry:
@@ -28,17 +28,20 @@ class EpisodeMetricsEntry:
     potential_platoon_severity: int
     vehicles: int
     platoon_size: int
-    loss: float
     epsilon_threshold: float
     platoon_risk: float
     average_platoon_risk: float
+    optim: OptimizationResult
 
     def save(self, dir: str, step: int):
         path = pathlib.Path(dir)
         path.mkdir(exist_ok=True, parents=True)
-        path = path / f"{utils.get_prefix()} {step:06}.log.json"
+        filename = f"{utils.get_prefix()} {step:06}.log.json"
+        path = path / filename
         with open(path, "w") as f:
             json.dump(dataclasses.asdict(self), f)
+
+
 
 
 @dataclass
@@ -48,7 +51,7 @@ class EpisodeMetricsTracker:
     def track_stats(
         self,
         game: Game,
-        loss: float,
+        optimization_results: OptimizationResult,
         step: int,
         epsilon_threshold: float,
     ) -> None:
@@ -66,7 +69,7 @@ class EpisodeMetricsTracker:
             vehicles=len(game.state.vehicles),
             platoon_risk=sum([v.risk for v in platoon_members]),
             average_platoon_risk=0 if len(platoon_members) == 0 else mean([v.risk for v in platoon_members]),
-            loss=loss,
+            optim=optimization_results,
             epsilon_threshold=epsilon_threshold,
         )
         self.stats.append(entry)
@@ -119,7 +122,7 @@ class EpisodeMetricsTracker:
 
     def plot_loss(self) -> None:
         plt.subplot(9, 2, 7)
-        plt.plot([x.loss for x in self.stats],label="loss")
+        plt.plot([x.optim.loss for x in self.stats],label="loss")
         plt.legend(loc="upper left")
         plt.title("loss")
 
