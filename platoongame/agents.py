@@ -372,8 +372,9 @@ class WolpertingerDefenderAgent(DefenderAgent):
         save_dir: pathlib.Path = pathlib.Path(save_dir)
         save_dir.mkdir(parents=True, exist_ok=True)
         models = ["actor", "actor_target", "critic", "critic_target"]
+        prefix = get_prefix()
         for model in models:
-            save_path = save_dir / f"{get_prefix()} {model}.pt"
+            save_path = save_dir / f"{prefix} {model}.pt"
             torch.save(getattr(self,model).state_dict(), save_path)
 
     def load(self, load_dir: str, load_prefix: str):

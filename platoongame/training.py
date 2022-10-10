@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Enum
 import pathlib
 import time
 from typing import List, Union
@@ -33,6 +34,7 @@ class WolpertingerDefenderAgentTrainerConfig:
     warmup: int
     update_policy_interval: int
     checkpoint_interval: int
+    policy_update_type: str
     metrics_callback: lambda metrics: None = lambda metrics: ()
 
     def __str__(self) -> str:
@@ -46,6 +48,7 @@ class WolpertingerDefenderAgentTrainerConfig:
             "attacker_agent": str(self.attacker_agent),
             "warmup": self.warmup,
             "update_policy_interval": self.update_policy_interval,
+            "policy_update_type": self.policy_update_type,
             "checkpoint_interval": self.checkpoint_interval,
             # "metrics_callback": None,
         })
@@ -164,22 +167,24 @@ class WolpertingerDefenderAgentTrainer:
                     print("optimizing ", end="")
                     loss = self.optimize_policy(config.defender_agent)
                     
-
-                    #region target update
-                    #from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26
-                    # def soft_update(target, source, tau):
-                    #     for target_param, param in zip(target.parameters(), source.parameters()):
-                    #         target_param.data.copy_(
-                    #             target_param.data * (1.0 - tau) + param.data * tau
-                    #         )
-                    # soft_update(defender_agent.actor_target, defender_agent.actor, self.tau)
-                    # soft_update(defender_agent.critic_target, defender_agent.critic, self.tau)
-
                     # Soft update wasn't training fast, trying hard update
                     if self.steps_done % config.update_policy_interval == 0:
-                        config.defender_agent.actor_target.load_state_dict(config.defender_agent.actor.state_dict())
-                        config.defender_agent.critic_target.load_state_dict(config.defender_agent.critic.state_dict())
                         print("policy update! ", end="")
+                        if config.policy_update_type == "soft":
+                            # region target update
+                            # from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26
+                            def soft_update(target, source, tau):
+                                for target_param, param in zip(target.parameters(), source.parameters()):
+                                    target_param.data.copy_(
+                                        target_param.data * (1.0 - tau) + param.data * tau
+                                    )
+                            soft_update(config.defender_agent.actor_target, config.defender_agent.actor, self.tau)
+                            soft_update(config.defender_agent.critic_target, config.defender_agent.critic, self.tau)
+                        elif config.policy_update_type == "hard":
+                            config.defender_agent.actor_target.load_state_dict(config.defender_agent.actor.state_dict())
+                            config.defender_agent.critic_target.load_state_dict(config.defender_agent.critic.state_dict())
+                        else:
+                            raise ValueError(f"unknown policy update type: \"{config.policy_update_type}\"")
                         # target_net.load_state_dict(policy_net.state_dict())
 
                 # track stats
