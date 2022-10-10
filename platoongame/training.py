@@ -55,6 +55,7 @@ class WolpertingerDefenderAgentTrainer:
         defender_agent: WolpertingerDefenderAgent,
         attacker_agent: Agent,
         warmup: int,
+        update_policy_interval: int,
         metrics_callback: lambda metrics: None = lambda metrics: (),
     ) -> List[List[EpisodeMetricsEntry]]:
         if (warmup < self.batch_size):
@@ -73,8 +74,8 @@ class WolpertingerDefenderAgentTrainer:
             ) # log starting positions
             from_state = game.state
 
-            for step in range(max_steps_per_episode):
-                print(f"episode {episode} step {step} ", end="")
+            for episode_step in range(max_steps_per_episode):
+                print(f"episode {episode} step {episode_step} ", end="")
                 #region manually invoke game loop
                 game.logger.debug("stepping")
 
@@ -92,7 +93,7 @@ class WolpertingerDefenderAgentTrainer:
                 game.step_count += 1
                 #endregion manually invoke game loop
                 
-                done = step == max_steps_per_episode - 1
+                done = episode_step == max_steps_per_episode - 1
 
                 # calculate reward
                 reward = 0 if done else defender_agent.get_utility(game.state)
@@ -115,6 +116,23 @@ class WolpertingerDefenderAgentTrainer:
                 if self.steps_done > warmup:
                     print("optimizing ", end="")
                     loss = self.optimize_policy(defender_agent)
+                    
+
+                    #region target update
+                    #from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26
+                    # def soft_update(target, source, tau):
+                    #     for target_param, param in zip(target.parameters(), source.parameters()):
+                    #         target_param.data.copy_(
+                    #             target_param.data * (1.0 - tau) + param.data * tau
+                    #         )
+                    # soft_update(defender_agent.actor_target, defender_agent.actor, self.tau)
+                    # soft_update(defender_agent.critic_target, defender_agent.critic, self.tau)
+
+                    # Soft update wasn't training fast, trying hard update
+                    if self.steps_done % update_policy_interval == 0:
+                        defender_agent.actor_target.load_state_dict(defender_agent.actor.state_dict())
+                        defender_agent.critic_target.load_state_dict(defender_agent.critic.state_dict())
+                        # target_net.load_state_dict(policy_net.state_dict())
 
                 # track stats
                 metrics.track_stats(
@@ -230,15 +248,5 @@ class WolpertingerDefenderAgentTrainer:
         # apply model weight update
         defender_agent.actor_optimizer.step()
         #endregion actor update
-
-        #region target update
-        #from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26
-        def soft_update(target, source, tau):
-            for target_param, param in zip(target.parameters(), source.parameters()):
-                target_param.data.copy_(
-                    target_param.data * (1.0 - tau) + param.data * tau
-                )
-        soft_update(defender_agent.actor_target, defender_agent.actor, self.tau)
-        soft_update(defender_agent.critic_target, defender_agent.critic, self.tau)
 
         return float(value_loss.detach().cpu().numpy())
