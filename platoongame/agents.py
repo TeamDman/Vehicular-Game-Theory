@@ -182,7 +182,7 @@ class AttackerAgent(Agent):
 
     
     def get_random_action(self, state: State) -> AttackerAction:
-        raise NotImplementedError() #todo
+        raise NotImplementedError() # todo implement attacker random action
 
 #endregion Base stuff
 
