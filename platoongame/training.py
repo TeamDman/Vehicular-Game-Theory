@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import pathlib
+import time
 from typing import List, Union
 from warnings import warn
 from metrics import EpisodeMetricsTracker, EpisodeMetricsEntry
@@ -79,7 +80,9 @@ class WolpertingerDefenderAgentTrainer:
 
             for episode_step in range(max_steps_per_episode):
                 i += 1
-                print(f"episode {episode} step {episode_step} ", end="")
+                now = time.strftime("%Y-%m-%d %H%M-%S")
+                print(f"{now} episode {episode} step {episode_step} ", end="")
+                
                 #region manually invoke game loop
                 game.logger.debug("stepping")
 
