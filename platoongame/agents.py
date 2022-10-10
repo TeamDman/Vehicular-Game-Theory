@@ -301,11 +301,11 @@ class WolpertingerDefenderAgent(DefenderAgent):
 
         self.actor = DefenderActor(state_shape_data).to(get_device())
         self.actor_target = DefenderActor(state_shape_data).to(get_device())
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=0.001)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=0.0005)
 
         self.critic = DefenderCritic().to(get_device())
         self.critic_target = DefenderCritic().to(get_device())
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=0.001)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=0.0005)
 
         # hard update
         self.actor_target.load_state_dict(self.actor.state_dict())
