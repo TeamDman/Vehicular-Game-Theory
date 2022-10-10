@@ -17,6 +17,7 @@ class EpisodeMetricsEntry:
     compromised_overall: float
     compromised_partial: float
     platoon_severity: int
+    potential_platoon_severity: int
     vehicles: int
     platoon_size: int
     loss: float
@@ -44,6 +45,7 @@ class EpisodeMetricsTracker:
             known_compromises=len([vuln for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
             compromised_overall=len([1 for vehicle in game.state.vehicles if all([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             compromised_partial=len([1 for vehicle in game.state.vehicles if any([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
+            potential_platoon_severity = sum([vuln.severity for vehicle in platoon_members for vuln in vehicle.vulnerabilities]),
             platoon_severity = sum([vuln.severity for vehicle in platoon_members for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
             platoon_size=len(platoon_members),
             vehicles=len(game.state.vehicles),
@@ -69,7 +71,8 @@ class EpisodeMetricsTracker:
 
     def plot_severity(self) -> None:
         plt.subplot(9, 2, 3)
-        plt.plot([x.platoon_severity for x in self.stats], label="severity", alpha=1)
+        plt.plot([x.platoon_severity for x in self.stats], label="severity", alpha=0.9)
+        plt.plot([x.potential_platoon_severity for x in self.stats], label="potential severity", alpha=0.9)
         plt.legend(loc="upper left")
         plt.title("platoon severity")
 

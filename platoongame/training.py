@@ -209,7 +209,7 @@ class WolpertingerDefenderAgentTrainer:
         # get the loss for the predicted grades
         value_loss: torch.Tensor = criterion(q_batch.flatten(), target_q_batch).mean()
         # print(f"loss={value_loss} predicted={q_batch.flatten()} target={target_q_batch}", end="")
-        print(f"loss={value_loss} ({value_loss / self.batch_size})", end="")
+        print(f"loss={value_loss} ({value_loss / self.batch_size} , {(q_batch.flatten() - target_q_batch).abs().max()})", end="")
         
         # track the loss to model weights
         value_loss.backward()
