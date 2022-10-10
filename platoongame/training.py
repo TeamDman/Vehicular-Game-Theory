@@ -87,7 +87,7 @@ class WolpertingerDefenderAgentTrainer:
     ):
         path = pathlib.Path(save_dir)
         path.mkdir(parents=True, exist_ok=True)
-        path = path / f"{utils.prefix} config.json"
+        path = path / f"{utils.get_prefix()} config.json"
         with open(path, "w") as f:
             json.dump(str(config), f)
 
@@ -98,6 +98,8 @@ class WolpertingerDefenderAgentTrainer:
         if (config.warmup < self.batch_size):
             raise ValueError("warmup must be greater than batch size")
         self.track_run_start(config, save_dir="checkpoints")
+        config.defender_agent.save(save_dir="checkpoints")
+
         metrics_history: List[EpisodeMetricsTracker] = []
         i = 0
         for episode in range(config.episodes):
@@ -110,6 +112,7 @@ class WolpertingerDefenderAgentTrainer:
                 game=game,
                 loss=0,
                 epsilon_threshold=self.get_epsilon_threshold(),
+                step=self.steps_done,
             ) # log starting positions
             from_state = game.state
 
@@ -174,8 +177,8 @@ class WolpertingerDefenderAgentTrainer:
 
                     # Soft update wasn't training fast, trying hard update
                     if self.steps_done % config.update_policy_interval == 0:
-                        config._agent.actor_target.load_state_dict(config._agent.actor.state_dict())
-                        config._agent.critic_target.load_state_dict(config._agent.critic.state_dict())
+                        config.defender_agent.actor_target.load_state_dict(config.defender_agent.actor.state_dict())
+                        config.defender_agent.critic_target.load_state_dict(config.defender_agent.critic.state_dict())
                         print("policy update! ", end="")
                         # target_net.load_state_dict(policy_net.state_dict())
 
@@ -184,10 +187,11 @@ class WolpertingerDefenderAgentTrainer:
                     game=game,
                     loss=loss,
                     epsilon_threshold=self.get_epsilon_threshold(),
+                    step=self.steps_done,
                 )
 
                 if i % config.checkpoint_interval == 0 and should_train:
-                    config._agent.save(save_dir="checkpoints")
+                    config.defender_agent.save(save_dir="checkpoints")
                     print("checkpointed! ", end="")
 
 

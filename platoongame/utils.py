@@ -22,7 +22,8 @@ def get_logger(name: str) -> logging.Logger:
     logger.addHandler(handler)
     return logger
 
-prefix = time.strftime("%Y-%m-%d %H%M-%S")
+def get_prefix() -> str:
+    return time.strftime("%Y-%m-%d %H%M-%S")
 
 ##################
 # DATA CLASSES

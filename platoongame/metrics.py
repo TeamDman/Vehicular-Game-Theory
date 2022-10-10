@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, _MISSING_TYPE
+import dataclasses
 import json
 import pathlib
 from statistics import mean
@@ -32,9 +33,14 @@ class EpisodeMetricsEntry:
     platoon_risk: float
     average_platoon_risk: float
 
-# todo: add new metrics
-# - Learning rate
-# - Risk of the platoon
+    def save(self, dir: str, step: int):
+        path = pathlib.Path(dir)
+        path.mkdir(exist_ok=True, parents=True)
+        path = path / f"{utils.get_prefix()} {step:06}.log.json"
+        with open(path, "w") as f:
+            json.dump(dataclasses.asdict(self), f)
+        # todo: write metrics history to disk
+
 
 @dataclass
 class EpisodeMetricsTracker:
@@ -44,10 +50,11 @@ class EpisodeMetricsTracker:
         self,
         game: Game,
         loss: float,
-        epsilon_threshold: float
+        step: int,
+        epsilon_threshold: float,
     ) -> None:
         platoon_members = [v for v in game.state.vehicles if v.in_platoon]
-        self.stats.append(EpisodeMetricsEntry(
+        entry = EpisodeMetricsEntry(
             defender_util=game.state.defender_utility,
             attacker_util=game.state.attacker_utility,
             compromises=len([1 for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
@@ -62,7 +69,9 @@ class EpisodeMetricsTracker:
             average_platoon_risk=0 if len(platoon_members) == 0 else mean([v.risk for v in platoon_members]),
             loss=loss,
             epsilon_threshold=epsilon_threshold,
-        ))
+        )
+        self.stats.append(entry)
+        entry.save(dir="logs", step=step)
 
     def plot_utilities(self) -> None:
         plt.subplot(9, 2, 1)
@@ -159,7 +168,3 @@ class EpisodeMetricsTracker:
         self.plot_platoon_risk()
         self.plot_average_platoon_risk()
         self.plot_epsilon_threshold()
-
-    def save(self):
-        pass
-        # todo: write metrics history to disk

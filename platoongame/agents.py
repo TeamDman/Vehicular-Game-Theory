@@ -6,7 +6,7 @@ from re import M
 import time
 from typing import Deque, List, Set, Union, FrozenSet, TYPE_CHECKING
 from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
-from utils import get_logger, prefix
+from utils import get_logger, get_prefix
 from vehicles import CompromiseState, Vehicle
 from pprint import pprint
 from collections import deque
@@ -373,7 +373,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         save_dir.mkdir(parents=True, exist_ok=True)
         models = ["actor", "actor_target", "critic", "critic_target"]
         for model in models:
-            save_path = save_dir / f"{prefix} {model}.pt"
+            save_path = save_dir / f"{get_prefix()} {model}.pt"
             torch.save(getattr(self,model).state_dict(), save_path)
 
     def load(self, load_dir: str, load_prefix: str):
