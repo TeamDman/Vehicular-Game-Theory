@@ -23,7 +23,7 @@ class DefenderAction:
     members: FrozenSet[int] # binary vector, indices of corresponding vehicle
     monitor: FrozenSet[int] # binary vector, indices of corresponding vehicle
 
-    def as_tensor(self, state_shape: StateShapeData):
+    def as_tensor_batch(self, state_shape: StateShapeData):
         members = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
         members[list(self.members)] = 1
         monitor = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
@@ -322,7 +322,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         state_obj: State
     ) -> DefenderAction:
         # convert from state object to tensors to be fed to the actor model
-        state = state_obj.as_tensors(self.state_shape_data)
+        state = state_obj.as_tensor_batch(self.state_shape_data)
         state = StateTensorBatch(
             vulnerabilities=state.vulnerabilities.to(get_device()),
             vehicles=state.vehicles.to(get_device()),
@@ -344,14 +344,13 @@ class WolpertingerDefenderAgent(DefenderAgent):
         action_q_values: torch.Tensor = self.critic(state, actions)
 
         # find the best action
-        best_action_indices = action_q_values.argmax(dim=1).cpu()
-        assert len(best_action_indices) == 1
-        best = best_action_indices[0]
+        best_action_index = action_q_values.argmax().cpu()
+        assert best_action_index.numel() == 1
 
         # convert binary vectors to vector of indices
         return DefenderAction(
-            members=frozenset(actions.members[0][best].cpu().nonzero().flatten().numpy()),
-            monitor=frozenset(actions.monitor[0][best].cpu().nonzero().flatten().numpy()),
+            members=frozenset(actions.members[0][best_action_index].cpu().nonzero().flatten().numpy()),
+            monitor=frozenset(actions.monitor[0][best_action_index].cpu().nonzero().flatten().numpy()),
         )
     
     def as_dict(self) -> Dict:

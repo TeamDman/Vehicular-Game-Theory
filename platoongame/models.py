@@ -1,4 +1,6 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
+from typing import List
 
 import torch
 import torch.nn as nn
@@ -18,16 +20,57 @@ class StateTensorBatch:
     vulnerabilities: torch.Tensor# (BatchSize, Vehicle, Vuln, VulnFeature)
     vehicles: torch.Tensor# (BatchSize, Vehicle, VehicleFeature)
 
+    def to_device(self, device: torch.device) -> StateTensorBatch:
+        return StateTensorBatch(
+            vulnerabilities=self.vulnerabilities.to(device),
+            vehicles=self.vehicles.to(device),
+        )
+
+    @staticmethod
+    def cat(items: List[StateTensorBatch]) -> StateTensorBatch:
+        return StateTensorBatch(
+            vulnerabilities=torch.cat([v.vulnerabilities for v in items]),
+            vehicles=torch.cat([v.vehicles for v in items]),
+        )
+    
+    @staticmethod
+    def zeros(shape_data: StateShapeData, batch_size: int) -> StateTensorBatch:
+        return StateTensorBatch(
+            vulnerabilities=torch.zeros((batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)),
+            vehicles=torch.zeros((batch_size, shape_data.num_vehicles, shape_data.num_vehicle_features)),
+        )
+
 
 @dataclass(frozen=True)
 class DefenderActionTensorBatch:
     members: torch.Tensor # batch, 'binary' vector len=|vehicles|
     monitor: torch.Tensor # batch, 'binary' vector len=|vehicles|
+    def to_device(self, device: torch.device) -> DefenderActionTensorBatch:
+        return DefenderActionTensorBatch(
+            members=self.members.to(device),
+            monitor=self.monitor.to(device),
+        )
+
+    @staticmethod
+    def cat(items: List[DefenderActionTensorBatch]) -> DefenderActionTensorBatch:
+        return DefenderActionTensorBatch(
+            members=torch.cat([v.members for v in items]),
+            monitor=torch.cat([v.monitor for v in items]),
+        )
 
 @dataclass(frozen=True)
 class AttackerActionTensorBatch:
     attack: torch.Tensor # batch, 'binary' vector len=|vehicles|
+    def to_device(self, device: torch.device) -> AttackerActionTensorBatch:
+        return AttackerActionTensorBatch(
+            attack=self.attack.to(device),
+        )
 
+    @staticmethod
+    def cat(items: List[AttackerActionTensorBatch]) -> AttackerActionTensorBatch:
+        return AttackerActionTensorBatch(
+            attack=torch.cat([v.attack for v in items]),
+        )
 
 # Generates actions
 class DefenderActor(nn.Module):
@@ -175,4 +218,4 @@ class DefenderCritic(nn.Module):
         x = self.hidden2(x)
         x = F.relu(x)
         x = self.score(x)
-        return x.reshape(-1, actions_per_batch)
+        return x.flatten()

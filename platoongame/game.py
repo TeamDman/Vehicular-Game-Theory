@@ -22,7 +22,7 @@ class State:
     defender_utility: int = 0
     attacker_utility: int = 0
 
-    def as_tensors(self, shape_data: StateShapeData) -> StateTensorBatch:
+    def as_tensor_batch(self, shape_data: StateShapeData) -> StateTensorBatch:
         shape = State.get_shape(shape_data, batch_size=1)
         vulns_quant = torch.zeros(shape.vulnerabilities)
         vehicles_quant = torch.zeros(shape.vehicles)
@@ -40,6 +40,14 @@ class State:
         return StateTensorBatch(
             vulnerabilities=(batch_size, shape_data.num_vehicles, shape_data.num_vulns, Vulnerability.get_shape()[0]),
             vehicles=(batch_size, shape_data.num_vehicles, Vehicle.get_shape()[0]),
+        )
+
+    @staticmethod
+    def zeros(shape_data: StateShapeData, batch_size: int) -> StateTensorBatch:
+        shape = State.get_shape(shape_data, batch_size)
+        return StateTensorBatch(
+            vulnerabilities=torch.zeros(shape.vulnerabilities),
+            vehicles=torch.zeros(shape.vehicles),
         )
 
 
