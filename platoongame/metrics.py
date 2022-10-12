@@ -51,6 +51,30 @@ class OptimizationTracker:
     ) -> None:
         self.stats.append(optimization_results)
 
+    def set_margins(self) -> None:
+        # plt.tight_layout()
+        fig = plt.figure()
+        fig.set_figheight(20)
+        fig.set_figwidth(16)
+        plt.subplots_adjust(
+            left=0.1,
+            bottom=0.1,
+            right=0.9,
+            top=0.9,
+            # wspace=0.4,
+            hspace=0.4,
+        )
+
+    def plot_loss(self) -> None:
+        plt.subplot(9, 2, 7)
+        plt.plot([x.optim.loss for x in self.stats],label="loss")
+        plt.legend(loc="upper left")
+        plt.title("loss")
+
+        
+    def plot(self):
+        self.plot_loss()
+
 @dataclass
 class EpisodeMetricsTracker:
     stats: List[EpisodeMetricsEntry] = field(default_factory=list)
@@ -121,12 +145,6 @@ class EpisodeMetricsTracker:
         plt.legend(loc="upper left")
         plt.title("membership")
 
-    def plot_loss(self) -> None:
-        plt.subplot(9, 2, 7)
-        plt.plot([x.optim.loss for x in self.stats],label="loss")
-        plt.legend(loc="upper left")
-        plt.title("loss")
-
     def plot_platoon_risk(self) -> None:
         plt.subplot(9, 2, 8)
         plt.plot([x.platoon_risk for x in self.stats],label="risk")
@@ -167,7 +185,6 @@ class EpisodeMetricsTracker:
         self.plot_vuln_compromises()
         self.plot_vulns()
         self.plot_membership()
-        self.plot_loss()
         self.plot_platoon_risk()
         self.plot_average_platoon_risk()
         self.plot_epsilon_threshold()

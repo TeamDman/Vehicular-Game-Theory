@@ -203,7 +203,7 @@ class WolpertingerDefenderAgentTrainer:
 
     def optimize_policy(self) -> OptimizationResult:
         batch = self.memory.sample(self.config.batch_size)
-        batch = TransitionTensorBatch.cat(batch)
+        batch = TransitionTensorBatch.cat(batch).to_device(get_device())
         shape_data = self.config.defender_agent.state_shape_data
             
         # state_batch = [v.state.as_tensors(shape_data) for v in batch]
