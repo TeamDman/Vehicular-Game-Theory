@@ -240,7 +240,7 @@ class WolpertingerDefenderAgentTrainer:
         # next_state_batch = StateTensorBatch.cat(next_state_batch).to_device(get_device())
 
         terminal_indices = batch.terminal == True
-        zero_state = StateTensorBatch.zeros(shape_data, terminal_indices.sum())
+        zero_state = StateTensorBatch.zeros(shape_data, terminal_indices.sum()).to_device(get_device())
         batch.next_state.vehicles[terminal_indices] = zero_state.vehicles
         batch.next_state.vulnerabilities[terminal_indices] = zero_state.vulnerabilities
         # batch.next_state[terminal_indices] = StateTensorBatch.zeros() torch.zeros(state_shape)
