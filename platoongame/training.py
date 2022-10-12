@@ -145,7 +145,7 @@ class WolpertingerDefenderAgentTrainer:
         )
         transition = transition.as_tensor_batch(self.config.defender_agent.state_shape_data)
         self.memory.push(transition)
-        if died:
+        if self.episode_step == self.config.max_steps_per_episode - 1:
             self.prepare_next_episode()
         else:
             self.prev_state = next_state
