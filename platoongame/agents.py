@@ -101,7 +101,7 @@ class DefenderAgent(Agent):
         compromises = sum([vuln.severity for vehicle in members for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED])
         # return len(members) * 10 - compromises ** 2
         # return int(len(members) * 10 - compromises ** 1.5)
-        return int(len(members) * 1 - compromises)
+        return int(len(members) * 2.5 - compromises)
         # return int(len(members) * 1 - compromises)
 
     def take_action(self, state: State, action: DefenderAction) -> State:
