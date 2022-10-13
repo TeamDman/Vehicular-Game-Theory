@@ -155,7 +155,8 @@ class WolpertingerDefenderAgentTrainer:
     def take_optim_step(self) -> None:
         print(f"{get_prefix()} episode {self.episode} step {self.episode_step} ", end="")
 
-        self.take_explore_step()
+        for _ in range(self.config.train_interval):
+            self.take_explore_step()
 
         print("optimizing ", end="")
         optim = self.optimize_policy()
