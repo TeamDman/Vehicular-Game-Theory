@@ -89,11 +89,11 @@ class RandomVehicleProvider(VehicleProvider):
         self.sev_dist = torch.distributions.Normal(torch.as_tensor(sev_mu, dtype=torch.float32), torch.as_tensor(sev_sigma, dtype=torch.float32))
     
     def next(self) -> Vehicle:
-        vulns = [Vulnerability(
+        vulns = tuple(Vulnerability(
             prob=float(self.prob_dist.sample().clamp(0,1)),
             severity=int(self.sev_dist.sample().clamp(1,5)),
             state=CompromiseState.NOT_COMPROMISED,
-        ) for _ in range(random.randint(0, self.max_vulns))]
+        ) for _ in range(random.randint(0, self.max_vulns)))
         risk = sum([v.prob * v.severity ** 2 for v in vulns])
         return Vehicle(risk=risk, vulnerabilities=vulns, in_platoon=False)
 
