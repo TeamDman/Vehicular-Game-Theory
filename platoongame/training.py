@@ -22,6 +22,8 @@ from utils import get_device, get_prefix
 import utils
 from tqdm.notebook import tqdm
 
+import matplotlib.pyplot as plt
+
 from vehicles import VehicleProvider, Vulnerability
 
 criterion = torch.nn.MSELoss()
@@ -44,11 +46,11 @@ class WolpertingerDefenderAgentTrainerConfig:
     metrics_tracker: TrainingMetricsTracker
     memory: ReplayMemory[TransitionTensorBatch]
 
-    reward_decay: float = 0.99
-    soft_update_tau:float = 0.001
-    epsilon_start:float = 0.9
-    epsilon_end:float = 0.05
-    epsilon_decay:float = 10000
+    reward_gamma: float
+    soft_update_tau: float 
+    epsilon_start: float 
+    epsilon_end: float 
+    epsilon_decay: float 
 
     def as_dict(self) -> Dict: 
         return {
@@ -63,7 +65,7 @@ class WolpertingerDefenderAgentTrainerConfig:
             "update_policy_interval": self.update_policy_interval,
             "policy_update_type": self.policy_update_type,
             "checkpoint_interval": self.checkpoint_interval,
-            "reward_decay": self.reward_decay,
+            "reward_gamma": self.reward_gamma,
             "soft_update_tau": self.soft_update_tau,
             "epsilon_start": self.epsilon_start,
             "epsilon_end": self.epsilon_end,
@@ -108,12 +110,19 @@ class WolpertingerDefenderAgentTrainer:
         assert config.memory.get_max_len() > config.batch_size
         self.config = config
 
-    def get_epsilon_threshold(self) -> float:
+    def get_epsilon_threshold(self, step) -> float:
         # https://www.desmos.com/calculator/kkt49vdqbj
-        return self.config.epsilon_end + (self.config.epsilon_start - self.config.epsilon_end) * math.exp(-1. * self.optim_step / self.config.epsilon_decay)
+        return self.config.epsilon_end + (self.config.epsilon_start - self.config.epsilon_end) * math.exp(-1. * step / self.config.epsilon_decay)
  
+    def plot_epsilon_threshold(self, num_steps:int) -> None:
+        plt.title("epsilon threshold")
+        points = [self.get_epsilon_threshold(i) for i in range(num_steps)]
+        plt.yticks(torch.arange(0,10,step=0.1))
+        plt.plot(points)
+        plt.show()
+
     def get_action(self, agent: WolpertingerDefenderAgent, state: State) -> DefenderAction:
-        if random.random() > self.get_epsilon_threshold():
+        if random.random() > self.get_epsilon_threshold(self.optim_step):
             return agent.get_action(state)
         else:
             return agent.get_random_action(state)
@@ -162,7 +171,7 @@ class WolpertingerDefenderAgentTrainer:
             print("policy updated! ", end="")
         self.config.metrics_tracker.track_stats(
             optimization_results=optim,
-            epsilon_threshold=self.get_epsilon_threshold()
+            epsilon_threshold=self.get_epsilon_threshold(self.optim_step)
         )
 
         should_checkpoint = self.config.checkpoint_interval is not None \
@@ -265,7 +274,7 @@ class WolpertingerDefenderAgentTrainer:
             # target q is initialized from the actual observed reward
             target_q_batch = batch.reward.clone()
             # target q is increased by discounted predicted future reward
-            target_q_batch[non_terminal_indices] += self.config.reward_decay * next_q_values[non_terminal_indices]
+            target_q_batch[non_terminal_indices] += self.config.reward_gamma * next_q_values[non_terminal_indices]
             assert target_q_batch.shape == (self.config.batch_size,)
 
         #region critic update
