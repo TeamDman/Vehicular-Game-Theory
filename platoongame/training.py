@@ -74,6 +74,15 @@ class WolpertingerDefenderAgentTrainerConfig:
             # "metrics_callback": None,
         }
 
+    def dump(self, dir: str, prefix: Union[None, str]) -> None:
+        path = pathlib.Path(dir)
+        path.mkdir(parents=True, exist_ok=True)
+        if prefix is None:
+            prefix = utils.get_prefix()
+        path = path / f"{prefix} config.json"
+        with open(path, "w") as f:
+            json.dump(self.as_dict(), f, indent=4)
+
 @dataclass
 class OptimizationResult:
     loss: float
@@ -83,7 +92,6 @@ class OptimizationResult:
     policy_loss: float
     policy_updated: bool
     
-
     @staticmethod
     def default():
         return OptimizationResult(0,0,0,0,0,False)
@@ -109,17 +117,6 @@ class WolpertingerDefenderAgentTrainer:
             return agent.get_action(state)
         else:
             return agent.get_random_action(state)
-
-    def track_run_start(
-        self,
-        config: WolpertingerDefenderAgentTrainerConfig,
-        save_dir: str,
-    ):
-        path = pathlib.Path(save_dir)
-        path.mkdir(parents=True, exist_ok=True)
-        path = path / f"{utils.get_prefix()} config.json"
-        with open(path, "w") as f:
-            json.dump(config.as_dict(), f, indent=4)
 
     def prepare_next_episode(self) -> None:
         self.game = Game(config=self.config.game_config, vehicle_provider=self.config.vehicle_provider)
@@ -185,7 +182,6 @@ class WolpertingerDefenderAgentTrainer:
         self.episode = 0
         self.optim_step = 0
         self.step = 0
-        self.track_run_start(self.config, save_dir="checkpoints")
         self.prepare_next_episode()
 
         print("Warming up...")
