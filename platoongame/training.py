@@ -167,7 +167,10 @@ class WolpertingerDefenderAgentTrainer:
             epsilon_threshold=self.get_epsilon_threshold()
         )
 
-        should_checkpoint = self.config.checkpoint_interval is not None and self.optim_step % self.config.checkpoint_interval == 0 and self.optim_step > 0
+        should_checkpoint = self.config.checkpoint_interval is not None \
+            and self.config.checkpoint_interval != -1 \
+            and self.optim_step % self.config.checkpoint_interval == 0 \
+            and self.optim_step > 0
         if should_checkpoint:
             self.config.defender_agent.save(dir="checkpoints")
             print("checkpointed! ", end="")
