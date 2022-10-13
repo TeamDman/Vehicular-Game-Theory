@@ -1,30 +1,10 @@
-# from models import DefenderActionTensorBatch, StateTensorBatch
-# from utils import get_device
-
-# a = defender.get_action(engine.game.state)
-# state = engine.game.state.as_tensors(defender.state_shape_data)
-# state = StateTensorBatch(
-#     vulnerabilities=state.vulnerabilities.to(get_device()),
-#     vehicles=state.vehicles.to(get_device()),
-# )
-# print("state", state.vehicles.shape, state.vulnerabilities.shape)
-# action = a.as_tensor(defender.state_shape_data)
-# action = DefenderActionTensorBatch(
-#     members=action.members.to(get_device()),
-#     monitor=action.monitor.to(get_device()),
-# )
-
-# print("action", action.members.shape, action.monitor.shape)
-# print(action)
-# q_values = defender.critic(state,action) 
-# print("q", q_values)
-# print("actual", defender.get_utility(defender.take_action(engine.game.state, a)))
 from dataclasses import dataclass
 from agents import Agent
 from game import Game, GameConfig
 from metrics import EpisodeMetricsTracker
 from vehicles import VehicleProvider
 from memory import ReplayMemory, TransitionTensorBatch
+from utils import get_device
 
 @dataclass
 class ModelEvaluator:
@@ -51,7 +31,7 @@ class ModelEvaluator:
         return metrics
 
     def sample_model_outputs(self) -> None:
-        batch = TransitionTensorBatch.cat(self.memory.sample(10))
+        batch = TransitionTensorBatch.cat(self.memory.sample(10)).to(get_device())
         batch.state.vehicles.std(dim=1)
         batch.state.vulnerabilities.std(dim=1)
         batch.reward
