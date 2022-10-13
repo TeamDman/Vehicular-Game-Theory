@@ -31,7 +31,7 @@ class ModelEvaluator:
         return metrics
 
     def sample_model_outputs(self) -> None:
-        batch = TransitionTensorBatch.cat(self.memory.sample(10)).to(get_device())
+        batch = TransitionTensorBatch.cat(self.memory.sample(10)).to_device(get_device())
         batch.state.vehicles.std(dim=1)
         batch.state.vulnerabilities.std(dim=1)
         batch.reward
