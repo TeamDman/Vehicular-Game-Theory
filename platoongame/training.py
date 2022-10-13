@@ -205,10 +205,8 @@ class WolpertingerDefenderAgentTrainer:
             self.step += 1
         print("Warmup complete~!")
 
-        with tqdm(total=self.config.train_steps) as progress:
-            while self.optim_step < self.config.train_steps:
-                self.take_optim_step()
-                progress.update(self.optim_step)
+        for _ in tqdm.trange(self.config.train_steps):
+            self.take_optim_step()
 
     def optimize_policy(self) -> OptimizationResult:
         batch = self.config.memory.sample(self.config.batch_size)
