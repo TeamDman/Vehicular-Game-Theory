@@ -1,3 +1,6 @@
+# Vehicular-Game-Theory
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/teamdman/vehicular-game-theory/blob/master/platoongame/training.ipynb)
 
 ## SEE ALSO
 

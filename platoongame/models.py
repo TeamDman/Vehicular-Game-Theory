@@ -135,8 +135,6 @@ class DefenderActor(nn.Module):
         x = self.hidden2(x)
         x = F.relu(x)
 
-        # members_proto = torch.relu(self.member_head(x))   # todo: investigate
-        # monitor_proto = torch.relu(self.monitor_head(x))  # todo: investigate
         members_proto = torch.sigmoid(self.member_head(x))
         monitor_proto = torch.sigmoid(self.monitor_head(x))
 

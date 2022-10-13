@@ -70,6 +70,10 @@ class ReplayMemory(ABC, Generic[T]):
         pass
 
     @abstractmethod
+    def get_max_len(self) -> int:
+        pass
+
+    @abstractmethod
     def __len__(self) -> int:
         pass
 
@@ -82,6 +86,9 @@ class DequeReplayMemory(ReplayMemory, Generic[T]):
 
     def sample(self, batch_size: int) -> List[T]:
         return random.sample(self.memory, batch_size)
+
+    def get_max_len(self) -> int:
+        return self.memory.maxlen
 
     def __len__(self) -> int:
         return len(self.memory)
@@ -96,6 +103,9 @@ class RingReplayMemory(ReplayMemory, Generic[T]):
 
     def __len__(self) -> int:
         return self.length
+        
+    def get_max_len(self) -> int:
+        return self.maxlen
 
     def __getitem__(self, idx) -> T:
         if idx < 0 or idx >= self.length:

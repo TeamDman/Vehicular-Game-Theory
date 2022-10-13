@@ -1,0 +1,29 @@
+{
+    "game_config": {
+        "max_vehicles": 30,
+        "cycle_every": 1,
+        "cycle_num": 10,
+        "cycle_allow_platoon": false
+    },
+    "vehicle_provider": "JsonVehicleProvider",
+    "train_steps": 50,
+    "warmup_steps": 4000,
+    "max_steps_per_episode": 25,
+    "defender_agent": "<agents.WolpertingerDefenderAgent object at 0x00000231CCBDD100>",
+    "defender_config": {
+        "name": "WolpertingerDefenderAgent",
+        "learning_rate": 0.001
+    },
+    "attacker_agent": "<agents.BasicAttackerAgent object at 0x00000231CCBCB700>",
+    "update_policy_interval": 10,
+    "policy_update_type": "soft",
+    "checkpoint_interval": 100,
+    "reward_decay": 0.99,
+    "soft_update_tau": 0.001,
+    "epsilon_start": 0.9,
+    "epsilon_end": 0.05,
+    "epsilon_decay": 10000,
+    "memory": {
+        "maxlen": 10000
+    }
+}

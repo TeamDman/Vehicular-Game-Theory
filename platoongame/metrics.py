@@ -28,7 +28,6 @@ class EpisodeMetricsEntry:
     potential_platoon_severity: int
     vehicles: int
     platoon_size: int
-    epsilon_threshold: float
     platoon_risk: float
     average_platoon_risk: float
 
@@ -41,21 +40,30 @@ class EpisodeMetricsEntry:
             json.dump(dataclasses.asdict(self), f)
 
 
+@dataclass
+class TrainingMetricsEntry:
+    optim: OptimizationResult
+    epsilon_threshold: float
+        
 
 @dataclass
-class OptimizationTracker:
+class TrainingMetricsTracker:
     stats: List[OptimizationResult] = field(default_factory=list)
     def track_stats(
         self,
         optimization_results: OptimizationResult,
+        epsilon_threshold: float,
     ) -> None:
-        self.stats.append(optimization_results)
+        self.stats.append(TrainingMetricsEntry(
+            optim=optimization_results,
+            epsilon_threshold=epsilon_threshold
+        ))
 
     def set_margins(self) -> None:
         # plt.tight_layout()
         fig = plt.figure()
-        fig.set_figheight(20)
-        fig.set_figwidth(16)
+        fig.set_figheight(8)
+        fig.set_figwidth(10)
         plt.subplots_adjust(
             left=0.1,
             bottom=0.1,
@@ -66,21 +74,27 @@ class OptimizationTracker:
         )
 
     def plot_loss(self) -> None:
-        plt.subplot(9, 2, 7)
+        plt.subplot(2, 1, 1)
         plt.plot([x.optim.loss for x in self.stats],label="loss")
         plt.legend(loc="upper left")
         plt.title("loss")
 
+    def plot_epsilon_threshold(self) -> None:
+        plt.subplot(2, 1, 2)
+        plt.plot([x.epsilon_threshold for x in self.stats],label="epsilon threshold")
+        plt.legend(loc="upper left")
+        plt.title("epsilon threshold")
+
         
     def plot(self):
+        self.set_margins()
         self.plot_loss()
+        self.plot_epsilon_threshold()
 
 @dataclass
 class EpisodeMetricsTracker:
     stats: List[EpisodeMetricsEntry] = field(default_factory=list)
-
-    def track_stats(self, trainer: WolpertingerDefenderAgentTrainer) -> None:
-        game = trainer.game
+    def track_stats(self, game: Game) -> None:
         platoon_members = [v for v in game.state.vehicles if v.in_platoon]
         entry = EpisodeMetricsEntry(
             defender_util=game.state.defender_utility,
@@ -95,7 +109,6 @@ class EpisodeMetricsTracker:
             vehicles=len(game.state.vehicles),
             platoon_risk=sum([v.risk for v in platoon_members]),
             average_platoon_risk=0 if len(platoon_members) == 0 else mean([v.risk for v in platoon_members]),
-            epsilon_threshold=trainer.get_epsilon_threshold(),
         )
         self.stats.append(entry)
         # entry.save(dir="logs", step=step)
@@ -146,22 +159,16 @@ class EpisodeMetricsTracker:
         plt.title("membership")
 
     def plot_platoon_risk(self) -> None:
-        plt.subplot(9, 2, 8)
+        plt.subplot(9, 2, 7)
         plt.plot([x.platoon_risk for x in self.stats],label="risk")
         plt.legend(loc="upper left")
         plt.title("platoon risk")
 
     def plot_average_platoon_risk(self) -> None:
-        plt.subplot(9, 2, 9)
+        plt.subplot(9, 2, 8)
         plt.plot([x.average_platoon_risk for x in self.stats],label="avg risk")
         plt.legend(loc="upper left")
         plt.title("average platoon risk")
-
-    def plot_epsilon_threshold(self) -> None:
-        plt.subplot(9, 2, 10)
-        plt.plot([x.epsilon_threshold for x in self.stats],label="epsilon threshold")
-        plt.legend(loc="upper left")
-        plt.title("epsilon threshold")
 
     def set_margins(self) -> None:
         # plt.tight_layout()
@@ -171,7 +178,7 @@ class EpisodeMetricsTracker:
         plt.subplots_adjust(
             left=0.1,
             bottom=0.1,
-            right=0.9,
+            # right=0.9,
             top=0.9,
             # wspace=0.4,
             hspace=0.4,
@@ -187,4 +194,3 @@ class EpisodeMetricsTracker:
         self.plot_membership()
         self.plot_platoon_risk()
         self.plot_average_platoon_risk()
-        self.plot_epsilon_threshold()

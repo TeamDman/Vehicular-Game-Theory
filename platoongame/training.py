@@ -6,10 +6,10 @@ from symbol import term
 import time
 from typing import Dict, List, Union
 from warnings import warn
-from metrics import EpisodeMetricsTracker, EpisodeMetricsEntry, OptimizationTracker
+from metrics import EpisodeMetricsTracker, EpisodeMetricsEntry, TrainingMetricsTracker
 from game import Game, GameConfig, State, StateTensorBatch
 
-from memory import DequeReplayMemory, Transition, TransitionTensorBatch
+from memory import DequeReplayMemory, ReplayMemory, Transition, TransitionTensorBatch
 import torch
 import random
 import math
@@ -32,7 +32,7 @@ class WolpertingerDefenderAgentTrainerConfig:
     game_config: GameConfig
     vehicle_provider: VehicleProvider
     train_steps: int
-    warmup_steps: int
+    warmup_replay: int
     max_steps_per_episode: int
     defender_agent: WolpertingerDefenderAgent
     attacker_agent: Agent
@@ -41,20 +41,21 @@ class WolpertingerDefenderAgentTrainerConfig:
     checkpoint_interval: Union[int, None]
     policy_update_type: str
 
+    metrics_tracker: TrainingMetricsTracker
+    memory: ReplayMemory[TransitionTensorBatch]
+
     reward_decay: float = 0.99
     soft_update_tau:float = 0.001
     epsilon_start:float = 0.9
     epsilon_end:float = 0.05
     epsilon_decay:float = 10000
 
-    metrics_callback: lambda metrics: None = lambda metrics: ()
-
     def as_dict(self) -> Dict: 
         return {
             "game_config": self.game_config.as_dict(),
             "vehicle_provider": self.vehicle_provider.__class__.__name__,
             "train_steps": self.train_steps,
-            "warmup_steps": self.warmup_steps,
+            "warmup_steps": self.warmup_replay,
             "max_steps_per_episode": self.max_steps_per_episode,
             "defender_agent": str(self.defender_agent),
             "defender_config": self.defender_agent.as_dict(),
@@ -67,6 +68,9 @@ class WolpertingerDefenderAgentTrainerConfig:
             "epsilon_start": self.epsilon_start,
             "epsilon_end": self.epsilon_end,
             "epsilon_decay": self.epsilon_decay,
+            "memory": {
+                "maxlen": self.memory.get_max_len(),
+            },
             # "metrics_callback": None,
         }
 
@@ -78,28 +82,26 @@ class OptimizationResult:
     diff_mean: float
     policy_loss: float
     policy_updated: bool
+    
 
     @staticmethod
     def default():
         return OptimizationResult(0,0,0,0,0,False)
 
 class WolpertingerDefenderAgentTrainer:
-
     game: Game
     prev_state: State
-    metrics_history: List[EpisodeMetricsTracker]
-    optimization_metrics: OptimizationTracker
     step: int
     optim_step: int
     episode: int
     episode_step: int
-    memory: DequeReplayMemory[TransitionTensorBatch]
 
     def __init__(self, config: WolpertingerDefenderAgentTrainerConfig) -> None:
+        assert config.memory.get_max_len() > config.batch_size
         self.config = config
 
     def get_epsilon_threshold(self) -> float:
-        # https://www.desmos.com/calculator/ylgxqq5rvd
+        # https://www.desmos.com/calculator/kkt49vdqbj
         return self.config.epsilon_end + (self.config.epsilon_start - self.config.epsilon_end) * math.exp(-1. * self.optim_step / self.config.epsilon_decay)
  
     def get_action(self, agent: WolpertingerDefenderAgent, state: State) -> DefenderAction:
@@ -120,11 +122,9 @@ class WolpertingerDefenderAgentTrainer:
             json.dump(config.as_dict(), f, indent=4)
 
     def prepare_next_episode(self) -> None:
-        self.current_episode_metrics = EpisodeMetricsTracker()
         self.game = Game(config=self.config.game_config, vehicle_provider=self.config.vehicle_provider)
         self.prev_state = self.game.state
         self.episode_step = 0
-        self.current_episode_metrics.track_stats(trainer=self)
         self.episode += 1
 
     def take_explore_step(self) -> None:
@@ -144,7 +144,7 @@ class WolpertingerDefenderAgentTrainer:
             terminal=died
         )
         transition = transition.as_tensor_batch(self.config.defender_agent.state_shape_data)
-        self.memory.push(transition)
+        self.config.memory.push(transition)
         if self.episode_step == self.config.max_steps_per_episode - 1:
             self.prepare_next_episode()
         else:
@@ -162,8 +162,10 @@ class WolpertingerDefenderAgentTrainer:
         print(f"loss={optim.loss:.4f} diff={{max={optim.diff_max:.4f}, min={optim.diff_min:.4f}, mean={optim.diff_mean:.4f}}} policy_loss={optim.policy_loss:.4f} ", end="")
         if optim.policy_updated:
             print("policy updated! ", end="")
-        self.current_episode_metrics.track_stats(trainer=self)
-        self.optimization_metrics.track_stats(optim)
+        self.config.metrics_tracker.track_stats(
+            optimization_results=optim,
+            epsilon_threshold=self.get_epsilon_threshold()
+        )
 
         should_checkpoint = self.config.checkpoint_interval is not None and self.optim_step % self.config.checkpoint_interval == 0 and self.optim_step > 0
         if should_checkpoint:
@@ -171,27 +173,25 @@ class WolpertingerDefenderAgentTrainer:
             print("checkpointed! ", end="")
     
         print() # write newline
-        self.metrics_history.append(self.current_episode_metrics)
         # allow for tracking metrics while being able to cancel training
-        self.config.metrics_callback(self.current_episode_metrics)
         self.step += 1
         self.optim_step += 1
 
-    def train(
-        self,
-    ) -> List[List[EpisodeMetricsEntry]]:
-        
-        self.metrics_history = []
+    def train(self) -> None:
         self.episode = 0
         self.optim_step = 0
         self.step = 0
-        self.optimization_metrics = OptimizationTracker()
         self.track_run_start(self.config, save_dir="checkpoints")
-        self.memory = DequeReplayMemory(10000)
         self.prepare_next_episode()
 
-        print("Warming up...")        
-        for _ in tqdm(range(max(self.config.warmup_steps, self.config.batch_size))):
+        print("Warming up...")
+        # desired minimum replay size after warmup
+        warmup_steps = max(self.config.warmup_replay, self.config.batch_size)
+        # find remaining steps needed
+        warmup_steps = warmup_steps - len(self.config.memory)
+        warmup_steps = max(0, warmup_steps)
+        assert warmup_steps < self.config.memory.get_max_len()
+        for _ in tqdm(range(warmup_steps)):
             self.take_explore_step()
             self.step += 1
         print("Warmup complete~!")
@@ -199,10 +199,8 @@ class WolpertingerDefenderAgentTrainer:
         while self.optim_step < self.config.train_steps:
             self.take_optim_step()
 
-        return self.metrics_history
-
     def optimize_policy(self) -> OptimizationResult:
-        batch = self.memory.sample(self.config.batch_size)
+        batch = self.config.memory.sample(self.config.batch_size)
         batch = TransitionTensorBatch.cat(batch).to_device(get_device())
         shape_data = self.config.defender_agent.state_shape_data
             

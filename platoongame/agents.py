@@ -182,7 +182,7 @@ class AttackerAgent(Agent):
 
     
     def get_random_action(self, state: State) -> AttackerAction:
-        raise NotImplementedError() # todo implement attacker random action
+        raise NotImplementedError()
 
 #endregion Base stuff
 
@@ -208,11 +208,7 @@ class BasicDefenderAgent(DefenderAgent):
 
     def get_action(self, state: State) -> DefenderAction:
         # pick next vehicle to monitor
-        choices = [
-            i for i,v in enumerate(state.vehicles)
-            # if v not in self.recently_monitored
-            # todo: investigate ways of preventing picking same vehicle without using vehicle IDs
-        ]
+        choices = [ i for i,v in enumerate(state.vehicles) ]
         random.shuffle(choices)
         monitor = set()
         if len(choices) == 0:
