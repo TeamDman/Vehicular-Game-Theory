@@ -63,6 +63,43 @@ class VehicleProvider:
         pass
 
 
+class RubbishVehicleProvider(VehicleProvider):
+    def __init__(self) -> None:
+        self.max_vulns=1
+
+    def next(self) -> Vehicle:
+        return Vehicle(
+            10,
+            [
+                Vulnerability(0.5,2,CompromiseState.NOT_COMPROMISED),
+            ]
+        )
+
+class RandomVehicleProvider(VehicleProvider):
+    def __init__(
+        self,
+        num_max_vulns: int,
+        prob_mu: float,
+        prob_sigma: float,
+        sev_mu: float,
+        sev_sigma: float,
+    ) -> None:
+        self.max_vulns = num_max_vulns
+        self.prob_dist = torch.distributions.Normal(torch.as_tensor(prob_mu), torch.as_tensor(prob_sigma))
+        self.sev_dist = torch.distributions.Normal(torch.as_tensor(sev_mu), torch.as_tensor(sev_sigma))
+    
+    def next(self) -> Vehicle:
+        vulns = [Vulnerability(
+            prob=float(self.prob_dist.sample().clamp(0,1)),
+            severity=int(self.sev_dist.sample().clamp(1,5)),
+            CompromiseState = CompromiseState.NOT_COMPROMISED,
+        ) for _ in range(random.randint(0, self.max_vulns))]
+        risk = sum([v.prob * v.severity ** 2 for v in vulns])
+        return Vehicle(risk=risk, vulnerabilities=vulns, in_platoon=False)
+
+    def reset(self) -> None:
+        pass
+
 class JsonVehicleProvider(VehicleProvider):
     vehicles: List[Vehicle]
     seen: Set[Vehicle]  # track vehicles we already provided
