@@ -205,7 +205,7 @@ class WolpertingerDefenderAgentTrainer:
             self.step += 1
         print("Warmup complete~!")
 
-        for _ in tqdm.trange(self.config.train_steps):
+        for _ in tqdm(range(self.config.train_steps)):
             self.take_optim_step()
 
     def optimize_policy(self) -> OptimizationResult:
