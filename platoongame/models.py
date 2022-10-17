@@ -135,8 +135,8 @@ class DefenderActor(nn.Module):
         x = self.hidden2(x)
         x = F.relu(x)
 
-        members_proto = torch.sigmoid(self.member_head(x))
-        monitor_proto = torch.sigmoid(self.monitor_head(x))
+        members_proto = torch.tanh(self.member_head(x))
+        monitor_proto = torch.tanh(self.monitor_head(x))
 
         # convert from [state,action] to [state,0,action] (action sub-batches of size 1 for each state)
         members_proto = members_proto.unsqueeze(dim=1)
