@@ -107,7 +107,7 @@ class WolpertingerDefenderAgentTrainer:
     episode_step: int
 
     def __init__(self, config: WolpertingerDefenderAgentTrainerConfig) -> None:
-        assert config.memory.get_max_len() > config.batch_size
+        assert config.memory.get_max_len() >= config.batch_size
         self.config = config
 
     def get_epsilon_threshold(self, step) -> float:
