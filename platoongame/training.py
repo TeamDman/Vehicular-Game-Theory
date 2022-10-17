@@ -199,7 +199,7 @@ class WolpertingerDefenderAgentTrainer:
         # find remaining steps needed
         warmup_steps = warmup_steps - len(self.config.memory)
         warmup_steps = max(0, warmup_steps)
-        assert warmup_steps < self.config.memory.get_max_len()
+        assert warmup_steps <= self.config.memory.get_max_len()
         for _ in tqdm(range(warmup_steps)):
             self.take_explore_step()
             self.step += 1
