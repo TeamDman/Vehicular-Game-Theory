@@ -84,19 +84,20 @@ class Game:
         attacker_agent: Agent,
         defender_agent: Agent
     ) -> None:
+        self.cycle()
+
         self.logger.debug("stepping")
-        self.logger.debug(f"attacker turn begin")
-        attacker_action = attacker_agent.get_action(self.state)
-        self.state = attacker_agent.take_action(self.state, attacker_action)
-        self.logger.debug(f"attacker turn end")
         
         self.logger.debug(f"defender turn begin")
         defender_action = defender_agent.get_action(self.state)
         self.state = defender_agent.take_action(self.state, defender_action)
         self.logger.debug(f"defender turn end")
-        
-        self.cycle()
 
+        self.logger.debug(f"attacker turn begin")
+        attacker_action = attacker_agent.get_action(self.state)
+        self.state = attacker_agent.take_action(self.state, attacker_action)
+        self.logger.debug(f"attacker turn end")
+        
         self.step += 1
 
         return attacker_action, defender_action

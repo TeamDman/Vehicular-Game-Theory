@@ -4,7 +4,7 @@ import logging
 import random
 from re import M
 import time
-from typing import Deque, Dict, List, Set, Union, FrozenSet, TYPE_CHECKING
+from typing import Deque, Dict, List, Optional, Set, Union, FrozenSet, TYPE_CHECKING
 from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
 from utils import get_logger, get_prefix
 from vehicles import CompromiseState, Vehicle
@@ -294,11 +294,20 @@ import torch
 import torch.optim
 
 class WolpertingerDefenderAgent(DefenderAgent):
-    def __init__(self, state_shape_data: StateShapeData, learning_rate: float, num_proposals: int) -> None:
+    def __init__(self,
+        state_shape_data: StateShapeData,
+        learning_rate: float,
+        num_proposals: int,
+        utility_func: Optional[lambda state: int],
+    ) -> None:
         super().__init__(get_logger("WolpertingerDefenderAgent"))
         self.learning_rate = learning_rate
         self.state_shape_data = state_shape_data
         self.num_proposals = num_proposals
+        # allow to monkey patch the utility function
+        # helps when adjusting game balance
+        if utility_func is not None:
+            self.get_utility = utility_func.__get__(self, utility_func)
 
         self.actor = DefenderActor(state_shape_data).to(get_device())
         self.actor_target = DefenderActor(state_shape_data).to(get_device())
