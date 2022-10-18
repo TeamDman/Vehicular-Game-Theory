@@ -96,12 +96,12 @@ class PassiveAgent(Agent):
         return self.__class__.__name__
 
 class DefenderAgent(Agent):
-    def get_utility(self, state: State) -> int:
+    def get_utility(self, state: State) -> float:
         members = [vehicle for vehicle in state.vehicles if vehicle.in_platoon]
         compromises = sum([vuln.severity for vehicle in members for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED])
         # return len(members) * 10 - compromises ** 2
         # return int(len(members) * 10 - compromises ** 1.5)
-        return int(len(members) * 2.5 - compromises)
+        return len(members) * 2.5 - compromises
         # return int(len(members) * 1 - compromises)
 
     def take_action(self, state: State, action: DefenderAction) -> State:
@@ -130,7 +130,7 @@ class DefenderAgent(Agent):
         change = self.get_utility(state)
         utility = state.defender_utility
         utility += change
-        self.logger.debug(f"utility {utility} ({change:+d})")
+        self.logger.debug(f"utility {utility} ({change:+.2f})")
         state = replace(state, defender_utility=utility)
 
         # return new state
