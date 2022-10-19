@@ -21,15 +21,16 @@ class EpisodeMetricsEntry:
     defender_util: float
     attacker_util: float
     compromises: int
-    known_compromises: int
-    compromised_overall: float
-    compromised_partial: float
+    # known_compromises: int
+    num_vulns: int
+    num_vehicles_fully_compromised: float
+    num_vehicles_partially_compromised: float
     platoon_severity: int
     potential_platoon_severity: int
     vehicles: int
     platoon_size: int
     platoon_risk: float
-    average_platoon_member_risk: float
+    max_platoon_member_risk: float
 
     def save(self, dir: str, step: int):
         path = pathlib.Path(dir)
@@ -100,7 +101,8 @@ class EpisodeMetricsTracker:
             defender_util=game.state.defender_utility,
             attacker_util=game.state.attacker_utility,
             compromises=len([1 for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
-            known_compromises=len([vuln for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
+            # known_compromises=len([vuln for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
+            num_vulns=sum([len(vehicle.vulnerabilities) for vehicle in game.state.vehicles])
             compromised_overall=len([1 for vehicle in game.state.vehicles if all([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             compromised_partial=len([1 for vehicle in game.state.vehicles if any([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             potential_platoon_severity = sum([vuln.severity for vehicle in platoon_members for vuln in vehicle.vulnerabilities]),
@@ -108,7 +110,7 @@ class EpisodeMetricsTracker:
             platoon_size=len(platoon_members),
             vehicles=len(game.state.vehicles),
             platoon_risk=sum([v.risk for v in platoon_members]),
-            average_platoon_member_risk=0 if len(platoon_members) == 0 else mean([v.risk for v in platoon_members]),
+            max_platoon_member_risk=0 if len(platoon_members) == 0 else max([v.risk for v in platoon_members]),
         )
         self.stats.append(entry)
         # entry.save(dir="logs", step=step)
@@ -137,15 +139,16 @@ class EpisodeMetricsTracker:
     def plot_vuln_compromises(self) -> None:
         plt.subplot(9, 2, 4)
         plt.plot([x.compromises for x in self.stats], label="compromises", alpha=0.9)
-        plt.plot([x.known_compromises for x in self.stats], label="known compromises", alpha=0.9)
+        plt.plot([x.num_vulns for x in self.stats], label="num vulns", alpha=0.9)
+        # plt.plot([x.known_compromises for x in self.stats], label="known compromises", alpha=0.9)
         # plt.set_yticks(np.arange(0,1,0.1))
         plt.title("vulnerability compromises")
         plt.legend(loc="upper left")
 
     def plot_vulns(self) -> None:
         plt.subplot(9, 2, 5)
-        plt.plot([x.compromised_overall for x in self.stats], label="overall", alpha=0.9)
-        plt.plot([x.compromised_partial for x in self.stats], label="partial", alpha=0.9)
+        plt.plot([x.num_vehicles_partially_compromised for x in self.stats], label="partially", alpha=0.9)
+        plt.plot([x.num_vehicles_fully_compromised for x in self.stats], label="fully", alpha=0.9)
         plt.plot([x.vehicles for x in self.stats],label="vehicle count", alpha=0.9)
         # plt.set_yticks(np.arange(0,1,0.1))
         plt.title("vehicle compromises")
@@ -164,9 +167,9 @@ class EpisodeMetricsTracker:
         plt.legend(loc="upper left")
         plt.title("platoon risk")
 
-    def plot_average_platoon_member_risk(self) -> None:
+    def plot_max_platoon_member_risk(self) -> None:
         plt.subplot(9, 2, 8)
-        plt.plot([x.average_platoon_member_risk for x in self.stats],label="avg risk")
+        plt.plot([x.max_platoon_member_risk for x in self.stats],label="avg risk")
         plt.legend(loc="upper left")
         plt.title("average platoon member risk")
 
@@ -193,4 +196,4 @@ class EpisodeMetricsTracker:
         self.plot_vulns()
         self.plot_membership()
         self.plot_platoon_risk()
-        self.plot_average_platoon_member_risk()
+        self.plot_max_platoon_member_risk()
