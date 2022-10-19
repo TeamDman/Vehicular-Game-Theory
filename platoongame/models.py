@@ -44,18 +44,18 @@ class StateTensorBatch:
 @dataclass(frozen=True)
 class DefenderActionTensorBatch:
     members: torch.Tensor # batch, 'binary' vector len=|vehicles|
-    monitor: torch.Tensor # batch, 'binary' vector len=|vehicles|
+    # monitor: torch.Tensor # batch, 'binary' vector len=|vehicles|
     def to_device(self, device: torch.device) -> DefenderActionTensorBatch:
         return DefenderActionTensorBatch(
             members=self.members.to(device),
-            monitor=self.monitor.to(device),
+            # monitor=self.monitor.to(device),
         )
 
     @staticmethod
     def cat(items: List[DefenderActionTensorBatch]) -> DefenderActionTensorBatch:
         return DefenderActionTensorBatch(
             members=torch.cat([v.members for v in items]),
-            monitor=torch.cat([v.monitor for v in items]),
+            # monitor=torch.cat([v.monitor for v in items]),
         )
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ class DefenderActor(nn.Module):
 
         # probability vectors, each elem {i} represents probability of vehicle {i} being chosen
         self.member_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who should be in platoon
-        self.monitor_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who to monitor
+        # self.monitor_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who to monitor
 
     ## not sure how this behaves with lazy modules so going to avoid for now
     ## https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py#L208-L213
@@ -136,15 +136,15 @@ class DefenderActor(nn.Module):
         x = F.relu(x)
 
         members_proto = torch.tanh(self.member_head(x))
-        monitor_proto = torch.tanh(self.monitor_head(x))
+        # monitor_proto = torch.tanh(self.monitor_head(x))
 
         # convert from [state,action] to [state,0,action] (action sub-batches of size 1 for each state)
         members_proto = members_proto.unsqueeze(dim=1)
-        monitor_proto = monitor_proto.unsqueeze(dim=1)
+        # monitor_proto = monitor_proto.unsqueeze(dim=1)
 
         return DefenderActionTensorBatch(
             members=members_proto,
-            monitor=monitor_proto,
+            # monitor=monitor_proto,
         )
 
 class DefenderCritic(nn.Module):
@@ -183,12 +183,12 @@ class DefenderCritic(nn.Module):
         assert len(state.vehicles.shape) == 3
         assert len(state.vulnerabilities.shape) == 4
         assert len(actions.members.shape) == 3
-        assert len(actions.monitor.shape) == 3
+        # assert len(actions.monitor.shape) == 3
 
         # vehicles and vulnerability batch sizes should match
         assert state.vehicles.shape[0] == state.vulnerabilities.shape[0]
         # members and monitor should match
-        assert actions.members.shape == actions.monitor.shape
+        # assert actions.members.shape == actions.monitor.shape
         # state and action batch sizes should match
         assert state.vehicles.shape[0] == actions.members.shape[0]
 
@@ -208,7 +208,7 @@ class DefenderCritic(nn.Module):
             x_a,
             x_b,
             actions.members.flatten(0,1),
-            actions.monitor.flatten(0,1),
+            # actions.monitor.flatten(0,1),
         ))
 
         x = self.hidden1(x)

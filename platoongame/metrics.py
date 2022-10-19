@@ -29,7 +29,7 @@ class EpisodeMetricsEntry:
     vehicles: int
     platoon_size: int
     platoon_risk: float
-    average_platoon_risk: float
+    average_platoon_member_risk: float
 
     def save(self, dir: str, step: int):
         path = pathlib.Path(dir)
@@ -108,7 +108,7 @@ class EpisodeMetricsTracker:
             platoon_size=len(platoon_members),
             vehicles=len(game.state.vehicles),
             platoon_risk=sum([v.risk for v in platoon_members]),
-            average_platoon_risk=0 if len(platoon_members) == 0 else mean([v.risk for v in platoon_members]),
+            average_platoon_member_risk=0 if len(platoon_members) == 0 else mean([v.risk for v in platoon_members]),
         )
         self.stats.append(entry)
         # entry.save(dir="logs", step=step)
@@ -164,11 +164,11 @@ class EpisodeMetricsTracker:
         plt.legend(loc="upper left")
         plt.title("platoon risk")
 
-    def plot_average_platoon_risk(self) -> None:
+    def plot_average_platoon_member_risk(self) -> None:
         plt.subplot(9, 2, 8)
-        plt.plot([x.average_platoon_risk for x in self.stats],label="avg risk")
+        plt.plot([x.average_platoon_member_risk for x in self.stats],label="avg risk")
         plt.legend(loc="upper left")
-        plt.title("average platoon risk")
+        plt.title("average platoon member risk")
 
     def set_margins(self) -> None:
         # plt.tight_layout()
@@ -193,4 +193,4 @@ class EpisodeMetricsTracker:
         self.plot_vulns()
         self.plot_membership()
         self.plot_platoon_risk()
-        self.plot_average_platoon_risk()
+        self.plot_average_platoon_member_risk()

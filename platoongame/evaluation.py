@@ -32,9 +32,9 @@ class ModelEvaluator:
 
     def sample_model_outputs(self) -> None:
         batch = TransitionTensorBatch.cat(self.memory.sample(10)).to_device(get_device())
-        batch.state.vehicles.std(dim=1)
-        batch.state.vulnerabilities.std(dim=1)
-        batch.reward
+        # batch.state.vehicles.std(dim=1)
+        # batch.state.vulnerabilities.std(dim=1)
+        # batch.reward
 
         proto_actions = self.defender_agent.actor(batch.state)
         print("action.members", proto_actions.members.sum(dim=0))

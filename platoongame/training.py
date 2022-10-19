@@ -227,7 +227,7 @@ class WolpertingerDefenderAgentTrainer:
         # action_batch = DefenderActionTensorBatch.cat(action_batch).to_device(get_device())
 
         assert batch.action.members.shape == (self.config.batch_size, 1, shape_data.num_vehicles)
-        assert batch.action.monitor.shape == (self.config.batch_size, 1, shape_data.num_vehicles)
+        # assert batch.action.monitor.shape == (self.config.batch_size, 1, shape_data.num_vehicles)
 
         assert batch.reward.shape == (self.config.batch_size,)
         assert batch.terminal.shape == (self.config.batch_size,)
@@ -259,7 +259,8 @@ class WolpertingerDefenderAgentTrainer:
             # get proto actions for the next states
             # should return [batch_size, 1, num_vehicles] tensors for members and monitor
             proto_actions:DefenderActionTensorBatch = self.config.defender_agent.actor_target(batch.next_state)
-            assert proto_actions.members.shape == proto_actions.monitor.shape == (self.config.batch_size, 1, shape_data.num_vehicles)
+            # assert proto_actions.members.shape == proto_actions.monitor.shape == (self.config.batch_size, 1, shape_data.num_vehicles)
+            assert proto_actions.members.shape == (self.config.batch_size, 1, shape_data.num_vehicles)
 
             # get the evaluation of the proto actions in their state
             next_q_values = self.config.defender_agent.critic_target(batch.next_state, proto_actions)

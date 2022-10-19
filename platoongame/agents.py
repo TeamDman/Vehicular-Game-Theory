@@ -21,17 +21,17 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class DefenderAction:
     members: FrozenSet[int] # binary vector, indices of corresponding vehicle
-    monitor: FrozenSet[int] # binary vector, indices of corresponding vehicle
+    # monitor: FrozenSet[int] # binary vector, indices of corresponding vehicle
 
     def as_tensor_batch(self, state_shape: StateShapeData):
         members = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
         members[list(self.members)] = 1
-        monitor = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
-        monitor[list(self.monitor)] = 1
+        # monitor = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
+        # monitor[list(self.monitor)] = 1
 
         return DefenderActionTensorBatch(
             members=members.unsqueeze(dim=0).unsqueeze(dim=1),
-            monitor=monitor.unsqueeze(dim=0).unsqueeze(dim=1),
+            # monitor=monitor.unsqueeze(dim=0).unsqueeze(dim=1),
         )
 
 
@@ -108,13 +108,13 @@ class DefenderAgent(Agent):
         # create mutable copy
         vehicles = list(state.vehicles)
 
-        # monitor vehicles
-        for i in action.monitor:
-            vehicle = vehicles[i]
-            self.logger.info(f"monitoring vehicle {i}")
-            # compromised vulns become known
-            vehicle = replace(vehicle, vulnerabilities=tuple([vuln if vuln.state != CompromiseState.COMPROMISED_UNKNOWN else replace(vuln, state = CompromiseState.COMPROMISED_KNOWN) for vuln in vehicle.vulnerabilities]))
-            vehicles[i] = vehicle
+        # # monitor vehicles
+        # for i in action.monitor:
+        #     vehicle = vehicles[i]
+        #     self.logger.info(f"monitoring vehicle {i}")
+        #     # compromised vulns become known
+        #     vehicle = replace(vehicle, vulnerabilities=tuple([vuln if vuln.state != CompromiseState.COMPROMISED_UNKNOWN else replace(vuln, state = CompromiseState.COMPROMISED_KNOWN) for vuln in vehicle.vulnerabilities]))
+        #     vehicles[i] = vehicle
 
         for i, v in enumerate(vehicles):
             vehicles[i] = replace(v, in_platoon = i in action.members)
@@ -137,12 +137,12 @@ class DefenderAgent(Agent):
         return state
 
     def get_random_action(self, state: State) -> DefenderAction:
-        members = [i for i,v in enumerate(state.vehicles) if v.in_platoon]
-        non_members = [i for i,v in enumerate(state.vehicles) if not v.in_platoon]
-        max_rand_monitor = 1
+        # members = [i for i,v in enumerate(state.vehicles) if v.in_platoon]
+        # non_members = [i for i,v in enumerate(state.vehicles) if not v.in_platoon]
+        # max_rand_monitor = 1
         return DefenderAction(
             members=frozenset(random.sample(range(len(state.vehicles)), random.randint(0,len(state.vehicles)))),
-            monitor=frozenset([] if len(members) < max_rand_monitor else random.sample(members, max_rand_monitor)),
+            # monitor=frozenset([] if len(members) < max_rand_monitor else random.sample(members, max_rand_monitor)),
         )
 
 class AttackerAgent(Agent):
@@ -150,10 +150,12 @@ class AttackerAgent(Agent):
         util = 0
         for vehicle in state.vehicles:
             for vuln in vehicle.vulnerabilities:
-                if vehicle.in_platoon and vuln.state != CompromiseState.NOT_COMPROMISED:
-                    util += vuln.severity
-                elif not vehicle.in_platoon and vuln.state == CompromiseState.COMPROMISED_UNKNOWN:
-                    util += vuln.severity / 4
+                if vuln.state != CompromiseState.NOT_COMPROMISED:
+                    util += vuln.severity / (1 if vehicle.in_platoon else 4)
+                # if vehicle.in_platoon and vuln.state != CompromiseState.NOT_COMPROMISED:
+                #     util += vuln.severity
+                # elif not vehicle.in_platoon and vuln.state == CompromiseState.COMPROMISED_UNKNOWN:
+                #     util += vuln.severity / 4
         return int(util)
 
     def take_action(self, state: State, action: AttackerAction) -> State:
@@ -165,7 +167,8 @@ class AttackerAgent(Agent):
                 if vuln.state != CompromiseState.NOT_COMPROMISED: continue
                 if random.random() > vuln.prob: continue
                 self.logger.info(f"successfully compromised vehicle {i} vuln {j} sev {vuln.severity}")
-                new_vulns = vehicle.vulnerabilities[:j] + (replace(vuln, state=CompromiseState.COMPROMISED_UNKNOWN),) + vehicle.vulnerabilities[j+1:]
+                # new_vulns = vehicle.vulnerabilities[:j] + (replace(vuln, state=CompromiseState.COMPROMISED_UNKNOWN),) + vehicle.vulnerabilities[j+1:]
+                new_vulns = vehicle.vulnerabilities[:j] + (replace(vuln, state=CompromiseState.COMPROMISED_KNOWN),) + vehicle.vulnerabilities[j+1:]
                 vehicle = replace(vehicle, vulnerabilities=new_vulns)
             vehicles[i] = vehicle
 
@@ -190,36 +193,36 @@ class AttackerAgent(Agent):
 #region human design agents
 ###############################
 class BasicDefenderAgent(DefenderAgent):
-    num_vehicles_monitoring_constraint: int
-    recently_monitored: Deque[Vehicle]
+    # num_vehicles_monitoring_constraint: int
+    # recently_monitored: Deque[Vehicle]
     tolerance_threshold: int
     # max_size: int
 
     def __init__(
         self,
-        monitor_limit: int = 1,
+        # monitor_limit: int = 1,
         tolerance_threshold: int = 3
     ) -> None:
         super().__init__(get_logger("BasicDefenderAgent"))
         self.recently_monitored = deque([], maxlen=3)
         self.tolerance_threshold = tolerance_threshold
         # self.max_size = 10
-        self.monitor_limit = monitor_limit
+        # self.monitor_limit = monitor_limit
 
     def get_action(self, state: State) -> DefenderAction:
-        # pick next vehicle to monitor
-        choices = [ i for i,v in enumerate(state.vehicles) ]
-        random.shuffle(choices)
-        monitor = set()
-        if len(choices) == 0:
-            self.logger.warn("no candidates found to monitor?")
-            pprint(state.vehicles)
-            pprint(self.recently_monitored)
-        else:
-            while len(monitor) < self.monitor_limit and len(choices) > 0:
-                x = choices.pop()
-                monitor.add(x)
-                self.recently_monitored.append(x)
+        # # pick next vehicle to monitor
+        # choices = [ i for i,v in enumerate(state.vehicles) ]
+        # random.shuffle(choices)
+        # monitor = set()
+        # if len(choices) == 0:
+        #     self.logger.warn("no candidates found to monitor?")
+        #     pprint(state.vehicles)
+        #     pprint(self.recently_monitored)
+        # else:
+        #     while len(monitor) < self.monitor_limit and len(choices) > 0:
+        #         x = choices.pop()
+        #         monitor.add(x)
+        #         self.recently_monitored.append(x)
 
         # kick risky vehicles from platoon
         kick = list()
@@ -253,7 +256,7 @@ class BasicDefenderAgent(DefenderAgent):
 
         return DefenderAction(
             members=frozenset(members),
-            monitor=frozenset(monitor),
+            # monitor=frozenset(monitor),
         )
 
 class BasicAttackerAgent(AttackerAgent):
@@ -343,7 +346,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
 
         # should be a batch of 1
         assert actions.members.shape[0] == 1
-        assert actions.monitor.shape[0] == 1
+        # assert actions.monitor.shape[0] == 1
 
         # grade the acctions using the critic
         action_q_values: torch.Tensor = self.critic(state, actions)
@@ -355,7 +358,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         # convert binary vectors to vector of indices
         return DefenderAction(
             members=frozenset(actions.members[0][best_action_index].cpu().nonzero().flatten().numpy()),
-            monitor=frozenset(actions.monitor[0][best_action_index].cpu().nonzero().flatten().numpy()),
+            # monitor=frozenset(actions.monitor[0][best_action_index].cpu().nonzero().flatten().numpy()),
         )
     
     def as_dict(self) -> Dict:
@@ -380,7 +383,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
             return rtn
         return DefenderActionTensorBatch(
             members=propose(proto_actions.members),
-            monitor=propose(proto_actions.monitor),
+            # monitor=propose(proto_actions.monitor),
         )
 
     def save(self, dir: str, prefix: str = None):
