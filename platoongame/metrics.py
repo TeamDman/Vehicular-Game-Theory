@@ -103,7 +103,7 @@ class EpisodeMetricsTracker:
             attacker_util=game.state.attacker_utility,
             compromises=len([1 for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
             # known_compromises=len([vuln for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
-            num_vulns=sum([len(vehicle.vulnerabilities) for vehicle in game.state.vehicles])
+            num_vulns=sum([len(vehicle.vulnerabilities) for vehicle in game.state.vehicles]),
             compromised_overall=len([1 for vehicle in game.state.vehicles if all([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             compromised_partial=len([1 for vehicle in game.state.vehicles if any([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             potential_platoon_severity = sum([vuln.severity for vehicle in platoon_members for vuln in vehicle.vulnerabilities]),
