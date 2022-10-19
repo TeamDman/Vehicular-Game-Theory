@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections import deque, namedtuple
+from collections import deque
 from dataclasses import dataclass
 import random
-from symbol import term
-from typing import Generic, List, TypeVar, Union
-from agents import Action
-from game import Game, State
-from models import AttackerActionTensorBatch, DefenderActionTensorBatch, StateShapeData, StateTensorBatch
+from typing import Generic, List, Optional, TypeVar, Union
+from agents import DefenderAction
+from game import State
+from models import DefenderActionTensorBatch, StateShapeData, StateTensorBatch
 import torch
 
 @dataclass(frozen=True)
 class Transition:
     state: State
-    action: Action
+    action: DefenderAction
     reward: float
     next_state: Union[State, None]
     terminal: bool
@@ -32,10 +31,10 @@ class Transition:
 @dataclass(frozen=True)
 class TransitionTensorBatch:
     state: StateTensorBatch
-    action: AttackerActionTensorBatch
-    reward: torch.Tensor[torch.float32]
+    action: DefenderActionTensorBatch
+    reward: torch.Tensor #torch.float32
     next_state: StateTensorBatch
-    terminal: torch.Tensor[bool]
+    terminal: torch.Tensor #torch.bool
 
     def to_device(self, device: torch.device) -> TransitionTensorBatch: 
         return TransitionTensorBatch(
@@ -88,6 +87,7 @@ class DequeReplayMemory(ReplayMemory, Generic[T]):
         return random.sample(self.memory, batch_size)
 
     def get_max_len(self) -> int:
+        assert self.memory.maxlen is not None
         return self.memory.maxlen
 
     def __len__(self) -> int:
@@ -95,6 +95,7 @@ class DequeReplayMemory(ReplayMemory, Generic[T]):
 
 # from https://github.com/ghliu/pytorch-ddpg/blob/master/memory.py#L36
 class RingReplayMemory(ReplayMemory, Generic[T]):
+    data: List[Optional[T]]
     def __init__(self, maxlen: int) -> None:
         self.maxlen = maxlen
         self.start = 0
@@ -110,7 +111,9 @@ class RingReplayMemory(ReplayMemory, Generic[T]):
     def __getitem__(self, idx) -> T:
         if idx < 0 or idx >= self.length:
             raise KeyError()
-        return self.data[(self.start + idx) % self.maxlen]
+        rtn = self.data[(self.start + idx) % self.maxlen]
+        assert rtn is not None
+        return rtn
 
     def push(self, v: T) -> None:
         if self.length < self.maxlen:

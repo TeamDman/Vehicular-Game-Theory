@@ -4,7 +4,7 @@ import logging
 import random
 from re import M
 import time
-from typing import Deque, Dict, List, Optional, Set, Union, FrozenSet, TYPE_CHECKING
+from typing import Callable, Deque, Dict, List, Optional, Set, Union, FrozenSet, TYPE_CHECKING
 from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
 from utils import get_logger, get_prefix
 from vehicles import CompromiseState, Vehicle
@@ -23,7 +23,7 @@ class DefenderAction:
     members: FrozenSet[int] # binary vector, indices of corresponding vehicle
     # monitor: FrozenSet[int] # binary vector, indices of corresponding vehicle
 
-    def as_tensor_batch(self, state_shape: StateShapeData):
+    def as_tensor_batch(self, state_shape: StateShapeData) -> DefenderActionTensorBatch:
         members = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
         members[list(self.members)] = 1
         # monitor = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
@@ -75,26 +75,6 @@ class Agent(ABC):
     def get_utility(self, state: State) -> int:
         pass
 
-#agent that does nothing, can act as defender or attacker
-class PassiveAgent(Agent):
-    def __init__(self) -> None:
-        super().__init__(get_logger("PassiveAgent"))
-
-    def get_action(self, state: State) -> Action:
-        return None
-
-    def get_random_action(self, state: State) -> Action:
-        return None
-
-    def take_action(self, state: State, action: Action) -> State:
-        return state
-
-    def get_utility(self, state: State) -> int:
-        return 0
-
-    def __str__(self) -> str:
-        return self.__class__.__name__
-
 class DefenderAgent(Agent):
     def get_utility(self, state: State) -> float:
         members = [vehicle for vehicle in state.vehicles if vehicle.in_platoon]
@@ -103,6 +83,10 @@ class DefenderAgent(Agent):
         # return int(len(members) * 10 - compromises ** 1.5)
         return len(members) * 2.5 - compromises
         # return int(len(members) * 1 - compromises)
+
+    @abstractmethod
+    def get_action(self, state: State) -> DefenderAction:
+        pass
 
     def take_action(self, state: State, action: DefenderAction) -> State:
         # create mutable copy
@@ -158,6 +142,10 @@ class AttackerAgent(Agent):
                 #     util += vuln.severity / 4
         return int(util)
 
+    @abstractmethod
+    def get_action(self, state: State) -> AttackerAction:
+        pass
+
     def take_action(self, state: State, action: AttackerAction) -> State:
         vehicles = list(state.vehicles)
         for i in action.attack:
@@ -187,6 +175,25 @@ class AttackerAgent(Agent):
     def get_random_action(self, state: State) -> AttackerAction:
         raise NotImplementedError()
 
+#agent that does nothing, can act as defender or attacker
+class PassiveAgent(DefenderAgent, AttackerAgent):
+    def __init__(self) -> None:
+        super().__init__(get_logger("PassiveAgent"))
+
+    def get_action(self, state: State) -> None:
+        return None
+
+    def get_random_action(self, state: State) -> None:
+        return None
+
+    def take_action(self, state: State, action: None) -> State:
+        return state
+
+    def get_utility(self, state: State) -> int:
+        return 0
+
+    def __str__(self) -> str:
+        return self.__class__.__name__
 #endregion Base stuff
 
 ###############################
@@ -264,7 +271,7 @@ class BasicAttackerAgent(AttackerAgent):
         super().__init__(get_logger("BasicAttackerAgent"))
         self.attack_limit = attack_limit
 
-    def get_action(self, state: State) -> None:
+    def get_action(self, state: State) -> AttackerAction:
         # Pick vehicle to attack
         candidates = list([(i,v) for i,v in enumerate(state.vehicles) if v.in_platoon])
         attack = set()
@@ -276,7 +283,7 @@ class BasicAttackerAgent(AttackerAgent):
             self.logger.warn("sanity check failed, no vehicles to attack")
         else:
             def eval_risk(v: Vehicle) -> float:
-                return [x.severity ** 2 * x.prob for x in v.vulnerabilities if x.state == CompromiseState.NOT_COMPROMISED]
+                return sum([x.severity ** 2 * x.prob for x in v.vulnerabilities if x.state == CompromiseState.NOT_COMPROMISED])
             candidates = sorted(candidates, key=lambda x: eval_risk(x[1]))
             for _ in range(self.attack_limit):
                 if len(candidates) == 0:
@@ -301,7 +308,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         state_shape_data: StateShapeData,
         learning_rate: float,
         num_proposals: int,
-        utility_func: Optional[lambda state: int],
+        utility_func: Optional[Callable[[WolpertingerDefenderAgent,State], float]],
     ) -> None:
         super().__init__(get_logger("WolpertingerDefenderAgent"))
         self.learning_rate = learning_rate
@@ -310,7 +317,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         # allow to monkey patch the utility function
         # helps when adjusting game balance
         if utility_func is not None:
-            self.get_utility = utility_func.__get__(self, utility_func)
+            self.get_utility = utility_func.__get__(self, utility_func)  # type: ignore
 
         self.actor = DefenderActor(state_shape_data).to(get_device())
         self.actor_target = DefenderActor(state_shape_data).to(get_device())
@@ -363,6 +370,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
     
     def as_dict(self) -> Dict:
         return {
+            "name": self.__class__.__name__,
             "learning_rate": self.learning_rate,
             "num_proposals": self.num_proposals,
             "actor_hidden1_out_features": self.actor.hidden1.out_features,
@@ -386,25 +394,20 @@ class WolpertingerDefenderAgent(DefenderAgent):
             # monitor=propose(proto_actions.monitor),
         )
 
-    def save(self, dir: str, prefix: str = None):
-        dir: pathlib.Path = pathlib.Path(dir)
-        dir.mkdir(parents=True, exist_ok=True)
+    def save(self, dir: str, prefix: Optional[str] = None):
+        path: pathlib.Path = pathlib.Path(dir)
+        path.mkdir(parents=True, exist_ok=True)
         models = ["actor", "actor_target", "critic", "critic_target"]
         if prefix is None:
             prefix = get_prefix()
         for model in models:
-            save_path = dir / f"{prefix} {model}.pt"
+            save_path = path / f"{prefix} {model}.pt"
             torch.save(getattr(self,model).state_dict(), save_path)
 
     def load(self, dir: str, prefix: str):
-        dir = pathlib.Path(dir)
+        path = pathlib.Path(dir)
         models = ["actor", "actor_target", "critic", "critic_target"]
         for model in models:
-            path = dir / f"{prefix} {model}.pt"
+            path = path / f"{prefix} {model}.pt"
             getattr(self,model).load_state_dict(torch.load(path, map_location=get_device()))
-    
-    def as_dict(self) -> str:
-        return {
-            "name": self.__class__.__name__,
-            "learning_rate": self.learning_rate,
-        }
+ 

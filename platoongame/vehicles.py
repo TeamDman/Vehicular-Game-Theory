@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import json
 import random
@@ -55,12 +56,11 @@ class Vehicle:
     def get_shape():
         return (2,)
 
-class VehicleProvider:
+class VehicleProvider(ABC):
     max_vulns: int
-    def next(self) -> Vehicle:
-        pass
 
-    def reset(self) -> None:
+    @abstractmethod
+    def next(self) -> Vehicle:
         pass
 
 
@@ -70,10 +70,8 @@ class RubbishVehicleProvider(VehicleProvider):
 
     def next(self) -> Vehicle:
         return Vehicle(
-            10,
-            [
-                Vulnerability(0.5,2,CompromiseState.NOT_COMPROMISED),
-            ]
+            risk=10,
+            vulnerabilities=( Vulnerability(0.5,2,CompromiseState.NOT_COMPROMISED), )
         )
 
 class RandomVehicleProvider(VehicleProvider):
@@ -97,9 +95,6 @@ class RandomVehicleProvider(VehicleProvider):
         ) for _ in range(random.randint(0, self.max_vulns)))
         risk = sum([v.prob * v.severity ** 2 for v in vulns])
         return Vehicle(risk=risk, vulnerabilities=vulns, in_platoon=False)
-
-    def reset(self) -> None:
-        pass
 
 class JsonVehicleProvider(VehicleProvider):
     vehicles: List[Vehicle]
@@ -149,3 +144,4 @@ class JsonVehicleProvider(VehicleProvider):
 
     def reset(self) -> None:
         self.logger.info("resetting json vehicle provider")
+        self.seen = set()

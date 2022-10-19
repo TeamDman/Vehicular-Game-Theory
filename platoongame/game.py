@@ -4,6 +4,7 @@ import dataclasses
 import json
 from re import S
 from typing import Dict, FrozenSet, List, Tuple, TYPE_CHECKING, Union
+from agents import AttackerAction, AttackerAgent, DefenderAction, DefenderAgent
 from models import StateTensorBatch, StateShapeData
 from utils import get_logger
 from vehicles import Vehicle, VehicleProvider, Vulnerability
@@ -15,6 +16,11 @@ import vehicles
 if TYPE_CHECKING:
     from agents import Agent
 
+
+@dataclass(frozen=True)
+class StateTensorBatchShape:
+    vulnerabilities: Tuple[int,int,int,int]
+    vehicles: Tuple[int,int,int]
 
 @dataclass(frozen=True)
 class State:
@@ -36,8 +42,8 @@ class State:
         )
 
     @staticmethod
-    def get_shape(shape_data: StateShapeData, batch_size: int) -> StateTensorBatch:
-        return StateTensorBatch(
+    def get_shape(shape_data: StateShapeData, batch_size: int) -> StateTensorBatchShape:
+        return StateTensorBatchShape(
             vulnerabilities=(batch_size, shape_data.num_vehicles, shape_data.num_vulns, Vulnerability.get_shape()[0]),
             vehicles=(batch_size, shape_data.num_vehicles, Vehicle.get_shape()[0]),
         )
@@ -53,10 +59,10 @@ class State:
 
 @dataclass
 class GameConfig:
-    max_vehicles: int = 10
-    cycle_every: Union[int,None] = None
-    cycle_num: int = None
-    cycle_allow_platoon: bool = False
+    max_vehicles: int
+    cycle_every: Union[int,None]
+    cycle_num: int
+    cycle_allow_platoon: bool
 
     def as_dict(self) -> Dict:
         return dataclasses.asdict(self)
@@ -72,18 +78,13 @@ class Game:
         self.logger = get_logger("Game")
         self.step = 0
         self.config = config
-        self.reset()
-
-    def reset(self) -> None:
-        self.logger.info("resetting game")
-        self.vehicle_provider.reset()
         self.state = State(vehicles=tuple([self.vehicle_provider.next() for _ in range(self.config.max_vehicles)]))
 
     def take_step(
         self,
-        attacker_agent: Agent,
-        defender_agent: Agent
-    ) -> None:
+        attacker_agent: AttackerAgent,
+        defender_agent: DefenderAgent
+    ) -> Tuple[AttackerAction, DefenderAction]:
         self.cycle()
 
         self.logger.debug("stepping")

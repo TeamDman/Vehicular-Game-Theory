@@ -179,7 +179,7 @@ class DefenderCritic(nn.Module):
         self,
         state: StateTensorBatch, # the state as context for the action
         actions: DefenderActionTensorBatch, # the action that is being graded
-    ) -> torch.tensor: # returns Q value (rating of the action)
+    ) -> torch.Tensor: # returns Q value (rating of the action)
         assert len(state.vehicles.shape) == 3
         assert len(state.vulnerabilities.shape) == 4
         assert len(actions.members.shape) == 3

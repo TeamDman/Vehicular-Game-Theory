@@ -1,20 +1,17 @@
 from __future__ import annotations
-from dataclasses import dataclass, field, _MISSING_TYPE
+from dataclasses import dataclass, field
 import dataclasses
 import json
 import pathlib
-from statistics import mean
-from agents import Agent
-from game import Game, GameConfig
-from utils import NoneRefersDefault
-from vehicles import CompromiseState, VehicleProvider, Vulnerability
-from typing import *
+from typing import TYPE_CHECKING, List
+from game import Game
+from vehicles import CompromiseState
 import matplotlib.pyplot as plt
 import numpy as np
 import utils
 
 if TYPE_CHECKING:
-    from training import WolpertingerDefenderAgentTrainer, OptimizationResult
+    from training import OptimizationResult
 
 @dataclass
 class EpisodeMetricsEntry:
@@ -50,7 +47,7 @@ class TrainingMetricsEntry:
 
 @dataclass
 class TrainingMetricsTracker:
-    stats: List[OptimizationResult] = field(default_factory=list)
+    stats: List[TrainingMetricsEntry] = field(default_factory=list)
     def track_stats(
         self,
         optimization_results: OptimizationResult,

@@ -13,7 +13,7 @@ from memory import DequeReplayMemory, ReplayMemory, Transition, TransitionTensor
 import torch
 import random
 import math
-from agents import Action, DefenderAction, DefenderActionTensorBatch, WolpertingerDefenderAgent, Agent
+from agents import Action, AttackerAgent, DefenderAction, DefenderActionTensorBatch, WolpertingerDefenderAgent, Agent
 
 import json 
 
@@ -37,7 +37,7 @@ class WolpertingerDefenderAgentTrainerConfig:
     warmup_replay: int
     max_steps_per_episode: int
     defender_agent: WolpertingerDefenderAgent
-    attacker_agent: Agent
+    attacker_agent: AttackerAgent
     update_policy_interval: int
     train_interval: int
     checkpoint_interval: Union[int, None]
@@ -138,22 +138,21 @@ class WolpertingerDefenderAgentTrainer:
             attacker_agent=self.config.attacker_agent,
             defender_agent=self.config.defender_agent
         )
-        # done = self.episode_step == self.config.max_steps_per_episode - 1
-        died = False # no "lose" state in our game :P
-        reward = 0 if died else self.config.defender_agent.get_utility(self.game.state)
-        next_state = None if died else self.game.state
+        reward = self.config.defender_agent.get_utility(self.game.state)
+        next_state = self.game.state
         transition = Transition(
             state=self.prev_state,
             next_state=next_state,
             action=defender_action,
             reward=reward,
-            terminal=died
+            terminal=False
         )
         transition = transition.as_tensor_batch(self.config.defender_agent.state_shape_data)
         self.config.memory.push(transition)
         if self.episode_step == self.config.max_steps_per_episode - 1:
             self.prepare_next_episode()
         else:
+            assert next_state is not None
             self.prev_state = next_state
             self.episode_step += 1
 
@@ -247,7 +246,10 @@ class WolpertingerDefenderAgentTrainer:
         # next_state_batch = StateTensorBatch.cat(next_state_batch).to_device(get_device())
 
         terminal_indices = batch.terminal == True
-        zero_state = StateTensorBatch.zeros(shape_data, terminal_indices.sum()).to_device(get_device())
+        zero_state = StateTensorBatch.zeros(
+            shape_data=shape_data,
+            batch_size=int(terminal_indices.sum())
+        ).to_device(get_device())
         batch.next_state.vehicles[terminal_indices] = zero_state.vehicles
         batch.next_state.vulnerabilities[terminal_indices] = zero_state.vulnerabilities
         # batch.next_state[terminal_indices] = StateTensorBatch.zeros() torch.zeros(state_shape)

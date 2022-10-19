@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from agents import Agent
+from agents import Agent, AttackerAgent, WolpertingerDefenderAgent
 from game import Game, GameConfig
 from metrics import EpisodeMetricsTracker
 from vehicles import VehicleProvider
@@ -8,8 +8,8 @@ from utils import get_device
 
 @dataclass
 class ModelEvaluator:
-    defender_agent: Agent
-    attacker_agent: Agent
+    defender_agent: WolpertingerDefenderAgent
+    attacker_agent: AttackerAgent
     game_config: GameConfig
     vehicle_provider: VehicleProvider
     memory: ReplayMemory
