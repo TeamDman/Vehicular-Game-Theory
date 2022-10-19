@@ -31,6 +31,7 @@ class EpisodeMetricsEntry:
     platoon_size: int
     platoon_risk: float
     max_platoon_member_risk: float
+    # todo: vulnerability severity heatmap over time
 
     def save(self, dir: str, step: int):
         path = pathlib.Path(dir)
