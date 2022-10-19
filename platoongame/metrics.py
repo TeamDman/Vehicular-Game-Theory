@@ -170,9 +170,9 @@ class EpisodeMetricsTracker:
 
     def plot_max_platoon_member_risk(self) -> None:
         plt.subplot(9, 2, 8)
-        plt.plot([x.max_platoon_member_risk for x in self.stats],label="avg risk")
+        plt.plot([x.max_platoon_member_risk for x in self.stats],label="max risk")
         plt.legend(loc="upper left")
-        plt.title("average platoon member risk")
+        plt.title("maximum platoon member risk")
 
     def set_margins(self) -> None:
         # plt.tight_layout()
