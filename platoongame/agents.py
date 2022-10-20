@@ -267,30 +267,36 @@ class BasicDefenderAgent(DefenderAgent):
         )
 
 class BasicAttackerAgent(AttackerAgent):
-    def __init__(self, attack_limit:int = 1) -> None:
+    def __init__(self, attack_limit:int, attack_interval: int) -> None:
         super().__init__(get_logger("BasicAttackerAgent"))
         self.attack_limit = attack_limit
+        self.attack_interval = attack_interval
+        self.step = 0
+
 
     def get_action(self, state: State) -> AttackerAction:
-        # Pick vehicle to attack
-        candidates = list([(i,v) for i,v in enumerate(state.vehicles) if v.in_platoon])
         attack = set()
-        if len(candidates) == 0:
-            # attack anything if platoon is empty
-            candidates = list(enumerate(state.vehicles))
+        if self.step % self.attack_interval == 0:
+            # Pick vehicle to attack
+            candidates = list([(i,v) for i,v in enumerate(state.vehicles) if v.in_platoon])
+            if len(candidates) == 0:
+                # attack anything if platoon is empty
+                candidates = list(enumerate(state.vehicles))
 
-        if len(candidates) == 0:
-            self.logger.warn("sanity check failed, no vehicles to attack")
-        else:
-            def eval_risk(v: Vehicle) -> float:
-                return sum([x.severity ** 2 * x.prob for x in v.vulnerabilities if x.state == CompromiseState.NOT_COMPROMISED])
-            candidates = sorted(candidates, key=lambda x: eval_risk(x[1]))
-            for _ in range(self.attack_limit):
-                if len(candidates) == 0:
-                    break
-                attack.add(candidates.pop()[0])
+            if len(candidates) == 0:
+                self.logger.warn("sanity check failed, no vehicles to attack")
+            else:
+                def eval_risk(v: Vehicle) -> float:
+                    return sum([x.severity ** 2 * x.prob for x in v.vulnerabilities if x.state == CompromiseState.NOT_COMPROMISED])
+                candidates = sorted(candidates, key=lambda x: eval_risk(x[1]))
+                for _ in range(self.attack_limit):
+                    if len(candidates) == 0:
+                        break
+                    attack.add(candidates.pop()[0])
 
+        self.step += 1
         return AttackerAction(attack=frozenset(attack))
+
 
 #endregion human design agents
 

@@ -101,6 +101,7 @@ class EpisodeMetricsTracker:
             compromises=len([1 for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
             # known_compromises=len([vuln for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
             num_vulns=sum([len(vehicle.vulnerabilities) for vehicle in game.state.vehicles]),
+            # todo: ensure partial and fully compromised vehicles don't include vehicles with no vulnerabilities, diagnose why "fully" starts gt 0
             num_vehicles_fully_compromised=len([1 for vehicle in game.state.vehicles if all([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             num_vehicles_partially_compromised=len([1 for vehicle in game.state.vehicles if any([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             potential_platoon_severity = sum([vuln.severity for vehicle in platoon_members for vuln in vehicle.vulnerabilities]),
