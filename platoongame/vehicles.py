@@ -25,7 +25,7 @@ class Vulnerability:
             self.severity,
             self.severity * self.severity,
             # split compromised/known state apart to help model learn
-            0 if self.state == CompromiseState.NOT_COMPROMISED else 0, 
+            0 if self.state == CompromiseState.NOT_COMPROMISED else 1, 
             # 1 if self.state == CompromiseState.COMPROMISED_KNOWN else 0
         ], dtype=torch.float32)
 
