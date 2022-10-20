@@ -1,7 +1,6 @@
 from __future__ import annotations
 import logging
 import random
-import numpy as np
 from typing import Callable, Dict, Optional, Union, FrozenSet, TYPE_CHECKING
 from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
 from utils import get_logger, get_prefix
@@ -129,7 +128,7 @@ class DefenderAgent(Agent):
 class RandomDefenderAgent(DefenderAgent):
     def __init__(self) -> None:
         super().__init__(get_logger("RandomDefenderAgent"))
-        
+
     def get_action(self, state: State) -> DefenderAction:
         return self.get_random_action(state)
 
@@ -356,16 +355,17 @@ class OrnsteinUhlenbeckProcess(AnnealedGaussianProcess):
         self.dt = dt
         self.x0 = x0
         self.size = size
+        self.normal = torch.distributions.Normal(torch.as_tensor(0, dtype=torch.float32), torch.as_tensor(1, dtype=torch.float32))
         self.reset_states()
 
     def sample(self):
-        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.current_sigma * np.sqrt(self.dt) * np.random.normal(size=self.size)
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.current_sigma * torch.sqrt(torch.as_tensor(self.dt, dtype=torch.float32)) * self.normal.sample_n(self.size)
         self.x_prev = x
         self.n_steps += 1
         return x
 
     def reset_states(self):
-        self.x_prev = self.x0 if self.x0 is not None else np.zeros(self.size)
+        self.x_prev = self.x0 if self.x0 is not None else torch.zeros(self.size)
 
 #endregion from original deepRL author code
 
@@ -428,7 +428,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         proto_actions: DefenderActionTensorBatch = self.actor(state)
         assert proto_actions.batch_size == 1, "batch size must be 1"
         if self.training:
-            proto_actions.members[0] += self.epsilon * self.random_process.sample()
+            proto_actions.members[0] += self.epsilon * self.random_process.sample().to(proto_actions.members.device)
             self.epsilon = max(0, self.epsilon-self.epsilon_decay)
 
         # convert proto actions to actual actions: -lt 0 => 0, -gt 0 => 1
