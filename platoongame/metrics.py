@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import dataclasses
 import json
 import pathlib
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 from game import Game
 from vehicles import CompromiseState
 import matplotlib.pyplot as plt
@@ -85,10 +85,10 @@ class TrainingMetricsTracker:
     #     plt.title("epsilon threshold")
 
         
-    def plot(self, only_show_small_loss: bool = False) -> None:
-        if only_show_small_loss:
+    def plot(self, loss_threshold: Optional[float] = None) -> None:
+        if loss_threshold is not None:
             from itertools import takewhile
-            TrainingMetricsTracker(stats=list(takewhile(lambda entry: entry.optim.loss <= 1, self.stats[::-1]))[::-1]).plot()
+            TrainingMetricsTracker(stats=list(takewhile(lambda entry: entry.optim.loss <= loss_threshold, self.stats[::-1]))[::-1]).plot()
             return
         self.set_margins()
         self.plot_loss()
