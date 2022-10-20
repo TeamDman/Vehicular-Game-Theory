@@ -1,14 +1,11 @@
 from __future__ import annotations
-import json
 import logging
 import random
-from re import M
-import time
-from typing import Callable, Deque, Dict, List, Optional, Set, Union, FrozenSet, TYPE_CHECKING
+import numpy as np
+from typing import Callable, Dict, Optional, Union, FrozenSet, TYPE_CHECKING
 from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
 from utils import get_logger, get_prefix
 from vehicles import CompromiseState, Vehicle
-from pprint import pprint
 from collections import deque
 from dataclasses import dataclass, replace
 from abc import ABC, abstractmethod
@@ -128,6 +125,13 @@ class DefenderAgent(Agent):
             members=frozenset(random.sample(range(len(state.vehicles)), random.randint(0,len(state.vehicles)))),
             # monitor=frozenset([] if len(members) < max_rand_monitor else random.sample(members, max_rand_monitor)),
         )
+
+class RandomDefenderAgent(DefenderAgent):
+    def __init__(self) -> None:
+        super().__init__(get_logger("RandomDefenderAgent"))
+        
+    def get_action(self, state: State) -> DefenderAction:
+        return self.get_random_action(state)
 
 class AttackerAgent(Agent):
     def get_utility(self, state: State) -> int:
@@ -317,11 +321,64 @@ from models import StateShapeData, DefenderActor, DefenderCritic
 import torch
 import torch.optim
 
+#region from original deepRL author code
+
+class RandomProcess(object):
+    def reset_states(self):
+        pass
+
+class AnnealedGaussianProcess(RandomProcess):
+    def __init__(self, mu, sigma, sigma_min, n_steps_annealing):
+        self.mu = mu
+        self.sigma = sigma
+        self.n_steps = 0
+
+        if sigma_min is not None:
+            self.m = -float(sigma - sigma_min) / float(n_steps_annealing)
+            self.c = sigma
+            self.sigma_min = sigma_min
+        else:
+            self.m = 0.
+            self.c = sigma
+            self.sigma_min = sigma
+
+    @property
+    def current_sigma(self):
+        sigma = max(self.sigma_min, self.m * float(self.n_steps) + self.c)
+        return sigma
+
+# Based on http://math.stackexchange.com/questions/1287634/implementing-ornstein-uhlenbeck-in-matlab
+class OrnsteinUhlenbeckProcess(AnnealedGaussianProcess):
+    def __init__(self, theta, mu=0., sigma=1., dt=1e-2, x0=None, size=1, sigma_min=None, n_steps_annealing=1000):
+        super(OrnsteinUhlenbeckProcess, self).__init__(mu=mu, sigma=sigma, sigma_min=sigma_min, n_steps_annealing=n_steps_annealing)
+        self.theta = theta
+        self.mu = mu
+        self.dt = dt
+        self.x0 = x0
+        self.size = size
+        self.reset_states()
+
+    def sample(self):
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.current_sigma * np.sqrt(self.dt) * np.random.normal(size=self.size)
+        self.x_prev = x
+        self.n_steps += 1
+        return x
+
+    def reset_states(self):
+        self.x_prev = self.x0 if self.x0 is not None else np.zeros(self.size)
+
+#endregion from original deepRL author code
+
+
 class WolpertingerDefenderAgent(DefenderAgent):
     def __init__(self,
         state_shape_data: StateShapeData,
         learning_rate: float,
         num_proposals: int,
+        ou_theta: float,
+        ou_mu: float,
+        ou_sigma: float,
+        epsilon_decay_time: int,
         utility_func: Optional[Callable[[WolpertingerDefenderAgent,State], float]] = None,
     ) -> None:
         super().__init__(get_logger("WolpertingerDefenderAgent"))
@@ -345,6 +402,16 @@ class WolpertingerDefenderAgent(DefenderAgent):
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.critic_target.load_state_dict(self.critic.state_dict())
 
+        self.random_process = OrnsteinUhlenbeckProcess(
+            size=state_shape_data.num_vehicles,
+            theta=ou_theta,
+            mu=ou_mu,
+            sigma=ou_sigma
+        )
+        self.training = False
+        self.epsilon = 1
+        self.epsilon_decay = 1.0 / epsilon_decay_time
+
     @torch.no_grad()
     def get_action(
         self,
@@ -359,8 +426,10 @@ class WolpertingerDefenderAgent(DefenderAgent):
         
         # get action suggestions from the actor
         proto_actions: DefenderActionTensorBatch = self.actor(state)
-        # todo: introduce epsilon-decaying noise to this while training
-        # todo: clip from -1 to 1
+        assert proto_actions.batch_size == 1, "batch size must be 1"
+        if self.training:
+            proto_actions.members[0] += self.epsilon * self.random_process.sample()
+            self.epsilon = max(0, self.epsilon-self.epsilon_decay)
 
         # convert proto actions to actual actions: -lt 0 => 0, -gt 0 => 1
         actions = self.collapse_proto_actions(proto_actions)

@@ -21,6 +21,7 @@ class ModelEvaluator:
         )
         metrics = EpisodeMetricsTracker()
         metrics.track_stats(game)
+        self.defender_agent.training = False # disable noise
         for i in range(num_turns):
             game.take_step(
                 attacker_agent=self.attacker_agent,

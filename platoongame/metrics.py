@@ -42,7 +42,7 @@ class EpisodeMetricsEntry:
 @dataclass
 class TrainingMetricsEntry:
     optim: OptimizationResult
-    epsilon_threshold: float
+    # epsilon_threshold: float
         
 
 @dataclass
@@ -51,11 +51,11 @@ class TrainingMetricsTracker:
     def track_stats(
         self,
         optimization_results: OptimizationResult,
-        epsilon_threshold: float,
+        # epsilon_threshold: float,
     ) -> None:
         self.stats.append(TrainingMetricsEntry(
             optim=optimization_results,
-            epsilon_threshold=epsilon_threshold
+            # epsilon_threshold=epsilon_threshold
         ))
 
     def set_margins(self) -> None:
@@ -78,17 +78,17 @@ class TrainingMetricsTracker:
         plt.legend(loc="upper left")
         plt.title("loss")
 
-    def plot_epsilon_threshold(self) -> None:
-        plt.subplot(2, 1, 2)
-        plt.plot([x.epsilon_threshold for x in self.stats],label="epsilon threshold")
-        plt.legend(loc="upper left")
-        plt.title("epsilon threshold")
+    # def plot_epsilon_threshold(self) -> None:
+    #     plt.subplot(2, 1, 2)
+    #     plt.plot([x.epsilon_threshold for x in self.stats],label="epsilon threshold")
+    #     plt.legend(loc="upper left")
+    #     plt.title("epsilon threshold")
 
         
     def plot(self):
         self.set_margins()
         self.plot_loss()
-        self.plot_epsilon_threshold()
+        # self.plot_epsilon_threshold()
 
 @dataclass
 class EpisodeMetricsTracker:

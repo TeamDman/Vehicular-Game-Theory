@@ -58,6 +58,10 @@ class DefenderActionTensorBatch:
             # monitor=torch.cat([v.monitor for v in items]),
         )
 
+    @property
+    def batch_size(self) -> int:
+        return self.members.shape[0]
+
 @dataclass(frozen=True)
 class AttackerActionTensorBatch:
     attack: torch.Tensor # batch, 'binary' vector len=|vehicles|

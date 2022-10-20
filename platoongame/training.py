@@ -13,7 +13,7 @@ from memory import DequeReplayMemory, ReplayMemory, Transition, TransitionTensor
 import torch
 import random
 import math
-from agents import Action, AttackerAgent, DefenderAction, DefenderActionTensorBatch, WolpertingerDefenderAgent, Agent
+from agents import Action, AttackerAgent, DefenderAction, DefenderActionTensorBatch, RandomDefenderAgent, WolpertingerDefenderAgent, Agent
 
 import json 
 
@@ -48,9 +48,9 @@ class WolpertingerDefenderAgentTrainerConfig:
 
     reward_gamma: float
     soft_update_tau: float 
-    epsilon_start: float 
-    epsilon_end: float 
-    epsilon_decay: float 
+    # epsilon_start: float 
+    # epsilon_end: float 
+    # epsilon_decay: float 
 
     def as_dict(self) -> Dict: 
         return {
@@ -67,9 +67,9 @@ class WolpertingerDefenderAgentTrainerConfig:
             "checkpoint_interval": self.checkpoint_interval,
             "reward_gamma": self.reward_gamma,
             "soft_update_tau": self.soft_update_tau,
-            "epsilon_start": self.epsilon_start,
-            "epsilon_end": self.epsilon_end,
-            "epsilon_decay": self.epsilon_decay,
+            # "epsilon_start": self.epsilon_start,
+            # "epsilon_end": self.epsilon_end,
+            # "epsilon_decay": self.epsilon_decay,
             "memory": {
                 "maxlen": self.memory.get_max_len(),
             },
@@ -105,27 +105,29 @@ class WolpertingerDefenderAgentTrainer:
     optim_step: int
     episode: int
     episode_step: int
+    random_defender_agent: RandomDefenderAgent
 
     def __init__(self, config: WolpertingerDefenderAgentTrainerConfig) -> None:
         assert config.memory.get_max_len() >= config.batch_size
         self.config = config
+        self.random_defender_agent = RandomDefenderAgent()
 
-    def get_epsilon_threshold(self, step) -> float:
-        # https://www.desmos.com/calculator/kkt49vdqbj
-        return self.config.epsilon_end + (self.config.epsilon_start - self.config.epsilon_end) * math.exp(-1. * step / self.config.epsilon_decay)
+    # def get_epsilon_threshold(self, step) -> float:
+    #     # https://www.desmos.com/calculator/kkt49vdqbj
+    #     return self.config.epsilon_end + (self.config.epsilon_start - self.config.epsilon_end) * math.exp(-1. * step / self.config.epsilon_decay)
  
-    def plot_epsilon_threshold(self, num_steps:int) -> None:
-        plt.title("epsilon threshold")
-        points = [self.get_epsilon_threshold(i) for i in range(num_steps)]
-        plt.yticks(torch.arange(0,10,step=0.1))
-        plt.plot(points)
-        plt.show()
+    # def plot_epsilon_threshold(self, num_steps:int) -> None:
+    #     plt.title("epsilon threshold")
+    #     points = [self.get_epsilon_threshold(i) for i in range(num_steps)]
+    #     plt.yticks(torch.arange(0,10,step=0.1))
+    #     plt.plot(points)
+    #     plt.show()
 
-    def get_action(self, agent: WolpertingerDefenderAgent, state: State) -> DefenderAction:
-        if random.random() > self.get_epsilon_threshold(self.optim_step):
-            return agent.get_action(state)
-        else:
-            return agent.get_random_action(state)
+    # def get_action(self, agent: WolpertingerDefenderAgent, state: State) -> DefenderAction:
+    #     if random.random() > self.get_epsilon_threshold(self.optim_step):
+    #         return agent.get_action(state)
+    #     else:
+    #         return agent.get_random_action(state)
 
     def prepare_next_episode(self) -> None:
         self.game = Game(config=self.config.game_config, vehicle_provider=self.config.vehicle_provider)
@@ -133,10 +135,10 @@ class WolpertingerDefenderAgentTrainer:
         self.episode_step = 0
         self.episode += 1
 
-    def take_explore_step(self) -> None:
+    def take_explore_step(self, random: bool) -> None:
         _, defender_action = self.game.take_step(
             attacker_agent=self.config.attacker_agent,
-            defender_agent=self.config.defender_agent
+            defender_agent=self.config.defender_agent if not random else self.random_defender_agent
         )
         reward = self.config.defender_agent.get_utility(self.game.state)
         next_state = self.game.state
@@ -159,18 +161,19 @@ class WolpertingerDefenderAgentTrainer:
 
     def take_optim_step(self) -> None:
         print(f"{get_prefix()} episode {self.episode} step {self.episode_step} ", end="")
-
+        self.config.defender_agent.training = False
         for _ in range(self.config.train_interval):
-            self.take_explore_step()
+            self.take_explore_step(random=True)
 
         print("optimizing ", end="")
+        self.config.defender_agent.training = True
         optim = self.optimize_policy()
         print(f"loss={optim.loss:.4f} diff={{max={optim.diff_max:.4f}, min={optim.diff_min:.4f}, mean={optim.diff_mean:.4f}}} policy_loss={optim.policy_loss:.4f} ", end="")
         if optim.policy_updated:
             print("policy updated! ", end="")
         self.config.metrics_tracker.track_stats(
             optimization_results=optim,
-            epsilon_threshold=self.get_epsilon_threshold(self.optim_step)
+            # epsilon_threshold=self.get_epsilon_threshold(self.optim_step)
         )
 
         should_checkpoint = self.config.checkpoint_interval is not None \
@@ -190,6 +193,7 @@ class WolpertingerDefenderAgentTrainer:
         self.episode = 0
         self.optim_step = 0
         self.step = 0
+        self.config.defender_agent.training = True
         self.prepare_next_episode()
 
         print("Warming up...")
@@ -200,7 +204,7 @@ class WolpertingerDefenderAgentTrainer:
         warmup_steps = max(0, warmup_steps)
         assert warmup_steps <= self.config.memory.get_max_len()
         for _ in tqdm(range(warmup_steps)):
-            self.take_explore_step()
+            self.take_explore_step(random=False)
             self.step += 1
         print("Warmup complete~!")
 
