@@ -267,11 +267,19 @@ class BasicDefenderAgent(DefenderAgent):
         )
 
 class BasicAttackerAgent(AttackerAgent):
-    def __init__(self, attack_limit:int, attack_interval: int) -> None:
+    def __init__(
+        self,
+        attack_limit:int,
+        attack_interval: int,
+        utility_func: Optional[Callable[[AttackerAgent,State], float]] = None,
+    ) -> None:
         super().__init__(get_logger("BasicAttackerAgent"))
         self.attack_limit = attack_limit
         self.attack_interval = attack_interval
         self.step = 0
+        if utility_func is not None:
+            self.get_utility = utility_func.__get__(self, utility_func)  # type: ignore
+
 
 
     def get_action(self, state: State) -> AttackerAction:
@@ -314,7 +322,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         state_shape_data: StateShapeData,
         learning_rate: float,
         num_proposals: int,
-        utility_func: Optional[Callable[[WolpertingerDefenderAgent,State], float]],
+        utility_func: Optional[Callable[[WolpertingerDefenderAgent,State], float]] = None,
     ) -> None:
         super().__init__(get_logger("WolpertingerDefenderAgent"))
         self.learning_rate = learning_rate
