@@ -85,7 +85,11 @@ class TrainingMetricsTracker:
     #     plt.title("epsilon threshold")
 
         
-    def plot(self):
+    def plot(self, only_show_small_loss: bool = False) -> None:
+        if only_show_small_loss:
+            from itertools import takewhile
+            TrainingMetricsTracker(stats=list(takewhile(lambda entry: entry.optim.loss <= 1, self.stats[::-1]))[::-1]).plot()
+            return
         self.set_margins()
         self.plot_loss()
         # self.plot_epsilon_threshold()
@@ -101,8 +105,7 @@ class EpisodeMetricsTracker:
             compromises=len([1 for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),
             # known_compromises=len([vuln for vehicle in game.state.vehicles for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]),
             num_vulns=sum([len(vehicle.vulnerabilities) for vehicle in game.state.vehicles]),
-            # todo: ensure partial and fully compromised vehicles don't include vehicles with no vulnerabilities, diagnose why "fully" starts gt 0
-            num_vehicles_fully_compromised=len([1 for vehicle in game.state.vehicles if all([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
+            num_vehicles_fully_compromised=len([1 for vehicle in game.state.vehicles if len(vehicle.vulnerabilities) > 0 and all([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             num_vehicles_partially_compromised=len([1 for vehicle in game.state.vehicles if any([True if vuln.state != CompromiseState.NOT_COMPROMISED else False for vuln in vehicle.vulnerabilities])]),
             potential_platoon_severity = sum([vuln.severity for vehicle in platoon_members for vuln in vehicle.vulnerabilities]),
             platoon_severity = sum([vuln.severity for vehicle in platoon_members for vuln in vehicle.vulnerabilities if vuln.state != CompromiseState.NOT_COMPROMISED]),

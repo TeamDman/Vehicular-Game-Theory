@@ -1,45 +1,44 @@
 from dataclasses import dataclass
-from agents import Agent, AttackerAgent, WolpertingerDefenderAgent
+from agents import Agent, AttackerAgent, DefenderAgent, WolpertingerDefenderAgent
 from game import Game, GameConfig
 from metrics import EpisodeMetricsTracker
 from vehicles import VehicleProvider
 from memory import ReplayMemory, TransitionTensorBatch
 from utils import get_device
 
-@dataclass
-class ModelEvaluator:
-    defender_agent: WolpertingerDefenderAgent
-    attacker_agent: AttackerAgent
-    game_config: GameConfig
-    vehicle_provider: VehicleProvider
-    memory: ReplayMemory
-    
-    def get_episode_metrics(self, num_turns: int) -> EpisodeMetricsTracker:
+def get_episode_metrics(
+    defender_agent: DefenderAgent,
+    attacker_agent: AttackerAgent,
+    game_config: GameConfig,
+    vehicle_provider: VehicleProvider,
+    num_turns: int,
+) -> EpisodeMetricsTracker:
         game = Game(
-            config=self.game_config,
-            vehicle_provider=self.vehicle_provider,
+            config=game_config,
+            vehicle_provider=vehicle_provider,
         )
         metrics = EpisodeMetricsTracker()
         metrics.track_stats(game)
-        self.defender_agent.training = False # disable noise
-        for i in range(num_turns):
+        if isinstance(defender_agent, WolpertingerDefenderAgent):
+            defender_agent.training = False # disable noise
+        for _ in range(num_turns):
             game.take_step(
-                attacker_agent=self.attacker_agent,
-                defender_agent=self.defender_agent
+                attacker_agent=attacker_agent,
+                defender_agent=defender_agent
             )
             metrics.track_stats(game)
 
         return metrics
 
-    def sample_model_outputs(self) -> None:
-        batch = TransitionTensorBatch.cat(self.memory.sample(10)).to_device(get_device())
-        # batch.state.vehicles.std(dim=1)
-        # batch.state.vulnerabilities.std(dim=1)
-        # batch.reward
+def sample_model_outputs(
+    defender_agent: WolpertingerDefenderAgent,
+    memory: ReplayMemory
+) -> None:
+    batch = TransitionTensorBatch.cat(memory.sample(10)).to_device(get_device())
 
-        proto_actions = self.defender_agent.actor(batch.state)
-        print("action.members", proto_actions.members.sum(dim=0))
-        q_values = self.defender_agent.critic(batch.state, proto_actions)
-        print("q_pred", q_values)
-        print("batch.reward", batch.reward)
-        print("pred reward err", q_values - batch.reward)
+    proto_actions = defender_agent.actor(batch.state)
+    print("action.members", proto_actions.members.sum(dim=0))
+    q_values = defender_agent.critic(batch.state, proto_actions)
+    print("q_pred", q_values)
+    print("batch.reward", batch.reward)
+    print("pred reward err", q_values - batch.reward)

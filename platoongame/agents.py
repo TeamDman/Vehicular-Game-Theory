@@ -359,7 +359,7 @@ class OrnsteinUhlenbeckProcess(AnnealedGaussianProcess):
         self.reset_states()
 
     def sample(self):
-        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.current_sigma * torch.sqrt(torch.as_tensor(self.dt, dtype=torch.float32)) * self.normal.sample_n(self.size)
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.current_sigma * torch.sqrt(torch.as_tensor(self.dt, dtype=torch.float32)) * self.normal.sample((self.size,))  # type: ignore
         self.x_prev = x
         self.n_steps += 1
         return x

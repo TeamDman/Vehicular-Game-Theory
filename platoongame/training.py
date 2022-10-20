@@ -161,12 +161,8 @@ class WolpertingerDefenderAgentTrainer:
 
     def take_optim_step(self) -> None:
         print(f"{get_prefix()} episode {self.episode} step {self.episode_step} ", end="")
-        self.config.defender_agent.training = False
-        for _ in range(self.config.train_interval):
-            self.take_explore_step(random=True)
 
         print("optimizing ", end="")
-        self.config.defender_agent.training = True
         optim = self.optimize_policy()
         print(f"loss={optim.loss:.4f} diff={{max={optim.diff_max:.4f}, min={optim.diff_min:.4f}, mean={optim.diff_mean:.4f}}} policy_loss={optim.policy_loss:.4f} ", end="")
         if optim.policy_updated:
@@ -193,7 +189,6 @@ class WolpertingerDefenderAgentTrainer:
         self.episode = 0
         self.optim_step = 0
         self.step = 0
-        self.config.defender_agent.training = True
         self.prepare_next_episode()
 
         print("Warming up...")
@@ -204,11 +199,22 @@ class WolpertingerDefenderAgentTrainer:
         warmup_steps = max(0, warmup_steps)
         assert warmup_steps <= self.config.memory.get_max_len()
         for _ in tqdm(range(warmup_steps)):
-            self.take_explore_step(random=False)
+            self.take_explore_step(random=True)
             self.step += 1
         print("Warmup complete~!")
 
+        # arbitrary number, but we need to be sure there are enough transitions that have rewards
+        # lost a lot of time debugging because of this
+        assert sum([e.reward for e in self.config.memory.sample(1000)]) > 100
+
+        # ensure the agent knows to use epsilon decay
+        self.config.defender_agent.training = True
+
         for _ in tqdm(range(self.config.train_steps)):
+            # exploration between optimization steps
+            for _ in range(self.config.train_interval):
+                self.take_explore_step(random=False)
+
             self.take_optim_step()
 
     def optimize_policy(self) -> OptimizationResult:
