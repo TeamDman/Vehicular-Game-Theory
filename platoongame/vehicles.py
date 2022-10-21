@@ -4,13 +4,12 @@ import json
 import random
 from typing import Set, Dict, List, Tuple, Optional, FrozenSet
 from utils import get_logger
-from enum import Enum
+from enum import Enum, auto
 import torch
 
 class CompromiseState(Enum):
-    NOT_COMPROMISED = 1
-    # COMPROMISED_UNKNOWN = 2
-    COMPROMISED_KNOWN = 3
+    NOT_COMPROMISED = auto()
+    COMPROMISED = auto()
 
 
 @dataclass(frozen=True)
@@ -24,14 +23,11 @@ class Vulnerability:
             self.prob,
             self.severity,
             self.severity * self.severity,
-            # split compromised/known state apart to help model learn
             0 if self.state == CompromiseState.NOT_COMPROMISED else 1, 
-            # 1 if self.state == CompromiseState.COMPROMISED_KNOWN else 0
         ], dtype=torch.float32)
 
     @staticmethod
     def get_shape():
-        # return (5,)
         return (4,)
 
 @dataclass(frozen=True)
@@ -98,11 +94,9 @@ class RandomVehicleProvider(VehicleProvider):
 
 class JsonVehicleProvider(VehicleProvider):
     vehicles: List[Vehicle]
-    seen: Set[Vehicle]  # track vehicles we already provided
 
     def __init__(self, path: str) -> None:
         self.logger = get_logger("JsonVehicleProvider")
-        self.seen = set()
 
         # load from file
         with open(path, "r") as f:
@@ -128,20 +122,9 @@ class JsonVehicleProvider(VehicleProvider):
                 vulnerabilities=tuple(vulns)
             )
             self.vehicles.append(vehicle)
-
-        ids = set()
-
+            
         self.max_vulns = max([len(v.vulnerabilities) for v in self.vehicles])
 
     def next(self) -> Vehicle:
-        # candidates = [v for v in self.vehicles if v not in self.seen]
-        candidates = [v for v in self.vehicles]
-        if len(candidates) == 0:
-            raise Exception("out of vehicles")
-        rtn = random.choice(candidates)
-        self.seen.add(rtn)
-        return rtn
+        return random.choice(self.vehicles)
 
-    def reset(self) -> None:
-        self.logger.info("resetting json vehicle provider")
-        self.seen = set()

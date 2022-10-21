@@ -47,10 +47,7 @@ class WolpertingerDefenderAgentTrainerConfig:
     memory: ReplayMemory[TransitionTensorBatch]
 
     reward_gamma: float
-    soft_update_tau: float 
-    # epsilon_start: float 
-    # epsilon_end: float 
-    # epsilon_decay: float 
+    soft_update_tau: float
 
     def as_dict(self) -> Dict: 
         return {
@@ -67,13 +64,9 @@ class WolpertingerDefenderAgentTrainerConfig:
             "checkpoint_interval": self.checkpoint_interval,
             "reward_gamma": self.reward_gamma,
             "soft_update_tau": self.soft_update_tau,
-            # "epsilon_start": self.epsilon_start,
-            # "epsilon_end": self.epsilon_end,
-            # "epsilon_decay": self.epsilon_decay,
             "memory": {
                 "maxlen": self.memory.get_max_len(),
             },
-            # "metrics_callback": None,
         }
 
     def dump(self, dir: str, prefix: Union[None, str]) -> None:
@@ -111,23 +104,6 @@ class WolpertingerDefenderAgentTrainer:
         assert config.memory.get_max_len() >= config.batch_size
         self.config = config
         self.random_defender_agent = RandomDefenderAgent()
-
-    # def get_epsilon_threshold(self, step) -> float:
-    #     # https://www.desmos.com/calculator/kkt49vdqbj
-    #     return self.config.epsilon_end + (self.config.epsilon_start - self.config.epsilon_end) * math.exp(-1. * step / self.config.epsilon_decay)
- 
-    # def plot_epsilon_threshold(self, num_steps:int) -> None:
-    #     plt.title("epsilon threshold")
-    #     points = [self.get_epsilon_threshold(i) for i in range(num_steps)]
-    #     plt.yticks(torch.arange(0,10,step=0.1))
-    #     plt.plot(points)
-    #     plt.show()
-
-    # def get_action(self, agent: WolpertingerDefenderAgent, state: State) -> DefenderAction:
-    #     if random.random() > self.get_epsilon_threshold(self.optim_step):
-    #         return agent.get_action(state)
-    #     else:
-    #         return agent.get_random_action(state)
 
     def prepare_next_episode(self) -> None:
         self.game = Game(config=self.config.game_config, vehicle_provider=self.config.vehicle_provider)
@@ -169,7 +145,6 @@ class WolpertingerDefenderAgentTrainer:
             print("policy updated! ", end="")
         self.config.metrics_tracker.track_stats(
             optimization_results=optim,
-            # epsilon_threshold=self.get_epsilon_threshold(self.optim_step)
         )
 
         should_checkpoint = self.config.checkpoint_interval is not None \
@@ -219,41 +194,18 @@ class WolpertingerDefenderAgentTrainer:
 
     def optimize_policy(self) -> OptimizationResult:
         batch = self.config.memory.sample(self.config.batch_size)
-        batch = TransitionTensorBatch.cat(batch).to_device(get_device())
+        batch = TransitionTensorBatch.cat(batch).to(get_device())
         shape_data = self.config.defender_agent.state_shape_data
             
-        # state_batch = [v.state.as_tensors(shape_data) for v in batch]
-        # state_batch = StateTensorBatch(
-        #     vulnerabilities=torch.cat([v.vulnerabilities for v in state_batch]).to(get_device()),
-        #     vehicles=torch.cat([v.vehicles for v in state_batch]).to(get_device()),
-        # )
         
         assert batch.state.vehicles.shape == (self.config.batch_size, shape_data.num_vehicles, shape_data.num_vehicle_features)
         assert batch.state.vulnerabilities.shape == (self.config.batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)
         assert batch.state.vehicles.shape[0] == batch.state.vulnerabilities.shape[0]
 
-        # action_batch = [v.action.as_tensor(shape_data) for v in batch]
-        # action_batch = DefenderActionTensorBatch.cat(action_batch).to_device(get_device())
-
         assert batch.action.members.shape == (self.config.batch_size, shape_data.num_vehicles)
-        # assert batch.action.monitor.shape == (self.config.batch_size, shape_data.num_vehicles)
 
         assert batch.reward.shape == (self.config.batch_size,)
         assert batch.terminal.shape == (self.config.batch_size,)
-
-        # get the batch of next states for calculating q
-        # next_state_batch = TransitionTensorBatch.ca
-        # def coalesce_next_state(transition: Transition) -> StateTensorBatch:
-        #     if transition.next_state is not None:
-        #         return transition.next_state.as_tensors(shape_data)
-        #     else:
-        #         shape = State.get_shape(shape_data, batch_size=1)
-        #         return StateTensorBatch(
-        #             vulnerabilities=torch.zeros(shape.vulnerabilities),
-        #             vehicles=torch.zeros(shape.vehicles),
-        #         )
-        # next_state_batch = [coalesce_next_state(entry) for entry in batch]
-        # next_state_batch = StateTensorBatch.cat(next_state_batch).to_device(get_device())
 
         terminal_indices = batch.terminal == True
         zero_state = StateTensorBatch.zeros(
@@ -262,16 +214,13 @@ class WolpertingerDefenderAgentTrainer:
         ).to(get_device())
         batch.next_state.vehicles[terminal_indices] = zero_state.vehicles
         batch.next_state.vulnerabilities[terminal_indices] = zero_state.vulnerabilities
-        # batch.next_state[terminal_indices] = StateTensorBatch.zeros() torch.zeros(state_shape)
 
         assert batch.next_state.vulnerabilities.shape == batch.state.vulnerabilities.shape
         assert batch.next_state.vehicles.shape == batch.state.vehicles.shape
 
         with torch.no_grad():
             # get proto actions for the next states
-            # should return [batch_size, 1, num_vehicles] tensors for members and monitor
             proto_actions:DefenderActionTensorBatch = self.config.defender_agent.actor_target(batch.next_state)
-            # assert proto_actions.members.shape == proto_actions.monitor.shape == (self.config.batch_size, 1, shape_data.num_vehicles)
             assert proto_actions.members.shape == (self.config.batch_size, shape_data.num_vehicles)
 
             # get the evaluation of the proto actions in their state

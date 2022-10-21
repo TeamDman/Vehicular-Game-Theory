@@ -34,7 +34,7 @@ def sample_model_outputs(
     defender_agent: WolpertingerDefenderAgent,
     memory: ReplayMemory
 ) -> None:
-    batch = TransitionTensorBatch.cat(memory.sample(10)).to_device(get_device())
+    batch = TransitionTensorBatch.cat(memory.sample(10)).to(get_device())
 
     proto_actions = defender_agent.actor(batch.state)
     print("action.members", proto_actions.members.sum(dim=0))

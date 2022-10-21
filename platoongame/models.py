@@ -50,18 +50,15 @@ class StateTensorBatch:
 @dataclass(frozen=True)
 class DefenderActionTensorBatch:
     members: torch.Tensor # batch, 'binary' vector len=|vehicles|
-    # monitor: torch.Tensor # batch, 'binary' vector len=|vehicles|
-    def to_device(self, device: torch.device) -> DefenderActionTensorBatch:
+    def to(self, device: torch.device) -> DefenderActionTensorBatch:
         return DefenderActionTensorBatch(
             members=self.members.to(device),
-            # monitor=self.monitor.to(device),
         )
 
     @staticmethod
     def cat(items: List[DefenderActionTensorBatch]) -> DefenderActionTensorBatch:
         return DefenderActionTensorBatch(
             members=torch.cat([v.members for v in items]),
-            # monitor=torch.cat([v.monitor for v in items]),
         )
 
     @property
@@ -71,7 +68,7 @@ class DefenderActionTensorBatch:
 @dataclass(frozen=True)
 class AttackerActionTensorBatch:
     attack: torch.Tensor # batch, 'binary' vector len=|vehicles|
-    def to_device(self, device: torch.device) -> AttackerActionTensorBatch:
+    def to(self, device: torch.device) -> AttackerActionTensorBatch:
         return AttackerActionTensorBatch(
             attack=self.attack.to(device),
         )
@@ -104,14 +101,11 @@ class DefenderActor(nn.Module):
         )
         self.vehicle_norm = nn.LazyBatchNorm1d()
 
-        # self.hidden1 = nn.LazyLinear(out_features = 400)
         self.hidden1 = nn.LazyLinear(out_features = 10000)
-        # self.hidden2 = nn.LazyLinear(out_features = 300)
         self.hidden2 = nn.LazyLinear(out_features = 1000)
 
         # probability vectors, each elem {i} represents probability of vehicle {i} being chosen
         self.member_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who should be in platoon
-        # self.monitor_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who to monitor
 
     ## not sure how this behaves with lazy modules so going to avoid for now
     ## https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py#L208-L213
@@ -145,11 +139,9 @@ class DefenderActor(nn.Module):
         x = F.relu(x)
 
         members_proto = torch.tanh(self.member_head(x))
-        # monitor_proto = torch.tanh(self.monitor_head(x))
 
         return DefenderActionTensorBatch(
             members=members_proto,
-            # monitor=monitor_proto,
         )
 
 class DefenderCritic(nn.Module):
@@ -172,21 +164,10 @@ class DefenderCritic(nn.Module):
         )
         self.vehicle_norm = nn.LazyBatchNorm1d()
 
-        # self.action_conv = nn.LazyConv1d(
-        #     out_channels = 4,
-        #     kernel_size=2,
-        #     stride=1
-        # )
-        # self.action_norm = nn.LazyBatchNorm1d()
-
-
         self.hidden1 = nn.LazyLinear(out_features = 10000)
         self.hidden2 = nn.LazyLinear(out_features = 1000)
         self.score = nn.LazyLinear(out_features = 1)
 
-        # # probability vectors, each elem {i} represents probability of vehicle {i} being chosen
-        # self.member_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who should be in platoon
-        # self.monitor_head = nn.LazyLinear(out_features = state_shape_data.num_vehicles) # who to monitor
     def forward(
         self,
         state: StateTensorBatch, # the state as context for the action
@@ -195,15 +176,12 @@ class DefenderCritic(nn.Module):
         assert len(state.vehicles.shape) == 3 # [batch, vehicle, vehicle_features]
         assert len(state.vulnerabilities.shape) == 4 # [batch, vehicle, vuln, vuln_features]
         assert len(actions.members.shape) == 2 # [batch, binary_member_vectors]
-        # assert len(actions.monitor.shape) == 3
+
 
         # vehicles and vulnerability batch sizes should match
         assert state.vehicles.shape[0] == state.vulnerabilities.shape[0]
-        # members and monitor should match
-        # assert actions.members.shape == actions.monitor.shape
         # state and action batch sizes should match
         assert state.vehicles.shape[0] == actions.members.shape[0]
-
 
         x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
         x_a = F.relu(self.vuln_norm(x_a))
@@ -211,8 +189,6 @@ class DefenderCritic(nn.Module):
         x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
         x_b = F.relu(self.vehicle_norm(x_b))
 
-        # x_c = F.relu(self.action_conv(actions.members))
-        # x_c = F.relu(self.action_norm(x_c))
         x_c = actions.members
 
         x = torch.cat((
@@ -222,13 +198,6 @@ class DefenderCritic(nn.Module):
             state.vulnerabilities.flatten(start_dim=1),
             state.vehicles.flatten(start_dim=1),
         ), dim=1)
-
-        # x = torch.hstack((
-        #     x_a,
-        #     x_b,
-        #     actions.members.flatten(0,1),
-        #     # actions.monitor.flatten(0,1),
-        # ))
 
         x = self.hidden1(x)
         x = F.relu(x)

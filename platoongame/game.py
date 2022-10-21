@@ -1,9 +1,7 @@
 from __future__ import annotations 
 from dataclasses import dataclass, replace
 import dataclasses
-import json
-from re import S
-from typing import Dict, FrozenSet, List, Tuple, TYPE_CHECKING, Union
+from typing import Dict, Tuple, TYPE_CHECKING, Union
 from agents import AttackerAction, AttackerAgent, DefenderAction, DefenderAgent
 from models import StateTensorBatch, StateShapeData
 from utils import get_logger
@@ -11,7 +9,6 @@ from vehicles import Vehicle, VehicleProvider, Vulnerability
 import logging
 import random
 import torch
-import vehicles
 
 if TYPE_CHECKING:
     from agents import Agent
@@ -105,7 +102,6 @@ class Game:
         return attacker_action, defender_action
 
     def cycle(self) -> None:
-        # if self.step_count % 3 == 0 and len(self.vehicles) < self.config.max_vehicles:
         if self.config.cycle_every is not None and self.step % self.config.cycle_every == 0:
             remove = set()
             candidates = list([(i,v) for i,v in enumerate(self.state.vehicles) if not v.in_platoon or self.config.cycle_allow_platoon])

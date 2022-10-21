@@ -17,17 +17,13 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class DefenderAction:
     members: FrozenSet[int] # binary vector, indices of corresponding vehicle
-    # monitor: FrozenSet[int] # binary vector, indices of corresponding vehicle
 
     def as_tensor_batch(self, state_shape: StateShapeData) -> DefenderActionTensorBatch:
         members = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
         members[list(self.members)] = 1
-        # monitor = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
-        # monitor[list(self.monitor)] = 1
 
         return DefenderActionTensorBatch(
             members=members.unsqueeze(dim=0),
-            # monitor=monitor.unsqueeze(dim=0),
         )
 
 
@@ -88,14 +84,6 @@ class DefenderAgent(Agent):
         # create mutable copy
         vehicles = list(state.vehicles)
 
-        # # monitor vehicles
-        # for i in action.monitor:
-        #     vehicle = vehicles[i]
-        #     self.logger.info(f"monitoring vehicle {i}")
-        #     # compromised vulns become known
-        #     vehicle = replace(vehicle, vulnerabilities=tuple([vuln if vuln.state != CompromiseState.COMPROMISED_UNKNOWN else replace(vuln, state = CompromiseState.COMPROMISED_KNOWN) for vuln in vehicle.vulnerabilities]))
-        #     vehicles[i] = vehicle
-
         for i, v in enumerate(vehicles):
             vehicles[i] = replace(v, in_platoon = i in action.members)
             # self.logger.info(f"kicking vehicle {i} out of platoon")
@@ -117,13 +105,9 @@ class DefenderAgent(Agent):
         return state
 
     def get_random_action(self, state: State) -> DefenderAction:
-        # members = [i for i,v in enumerate(state.vehicles) if v.in_platoon]
-        # non_members = [i for i,v in enumerate(state.vehicles) if not v.in_platoon]
-        # max_rand_monitor = 1
-        return DefenderAction(
-            members=frozenset(random.sample(range(len(state.vehicles)), random.randint(0,len(state.vehicles)))),
-            # monitor=frozenset([] if len(members) < max_rand_monitor else random.sample(members, max_rand_monitor)),
-        )
+        num_members = random.randint(0,len(state.vehicles))
+        members = random.sample(range(len(state.vehicles)), num_members)
+        return DefenderAction(members=frozenset(members))
 
 class RandomDefenderAgent(DefenderAgent):
     def __init__(self) -> None:
@@ -159,7 +143,7 @@ class AttackerAgent(Agent):
                 if random.random() > vuln.prob: continue
                 self.logger.info(f"successfully compromised vehicle {i} vuln {j} sev {vuln.severity}")
                 # new_vulns = vehicle.vulnerabilities[:j] + (replace(vuln, state=CompromiseState.COMPROMISED_UNKNOWN),) + vehicle.vulnerabilities[j+1:]
-                new_vulns = vehicle.vulnerabilities[:j] + (replace(vuln, state=CompromiseState.COMPROMISED_KNOWN),) + vehicle.vulnerabilities[j+1:]
+                new_vulns = vehicle.vulnerabilities[:j] + (replace(vuln, state=CompromiseState.COMPROMISED),) + vehicle.vulnerabilities[j+1:]
                 vehicle = replace(vehicle, vulnerabilities=new_vulns)
             vehicles[i] = vehicle
 
@@ -203,60 +187,30 @@ class PassiveAgent(DefenderAgent, AttackerAgent):
 #region human design agents
 ###############################
 class BasicDefenderAgent(DefenderAgent):
-    # num_vehicles_monitoring_constraint: int
-    # recently_monitored: Deque[Vehicle]
     tolerance_threshold: int
-    # max_size: int
 
     def __init__(
         self,
-        # monitor_limit: int = 1,
         tolerance_threshold: int = 3
     ) -> None:
         super().__init__(get_logger("BasicDefenderAgent"))
-        self.recently_monitored = deque([], maxlen=3)
-        self.tolerance_threshold = tolerance_threshold
-        # self.max_size = 10
-        # self.monitor_limit = monitor_limit
-
     def get_action(self, state: State) -> DefenderAction:
-        # # pick next vehicle to monitor
-        # choices = [ i for i,v in enumerate(state.vehicles) ]
-        # random.shuffle(choices)
-        # monitor = set()
-        # if len(choices) == 0:
-        #     self.logger.warn("no candidates found to monitor?")
-        #     pprint(state.vehicles)
-        #     pprint(self.recently_monitored)
-        # else:
-        #     while len(monitor) < self.monitor_limit and len(choices) > 0:
-        #         x = choices.pop()
-        #         monitor.add(x)
-        #         self.recently_monitored.append(x)
-
+        
         # kick risky vehicles from platoon
         kick = list()
         for i,vehicle in enumerate(state.vehicles):
             if not vehicle.in_platoon: continue
-            total = sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN])
+            total = sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED])
             if total > self.tolerance_threshold:
                 kick.append(i)
 
         # join low risk vehicles into the platoon
-        join = list()
-        # member_count = len([1 for v in state.vehicles if v.in_platoon])
-        candidates = [
+        join = [
             i for i,vehicle in enumerate(state.vehicles)
             if not vehicle.in_platoon
             and vehicle.risk <= 10
-            and sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED_KNOWN]) <= self.tolerance_threshold
-            # and member_count < self.max_size
+            and sum([vuln.severity for vuln in vehicle.vulnerabilities if vuln.state == CompromiseState.COMPROMISED]) <= self.tolerance_threshold
         ]
-        random.shuffle(candidates)
-        while len(candidates) > 0:
-        # while member_count + len(join) < self.max_size and len(candidates) > 0:
-            # take while there's room in the platoon
-            join.append(candidates.pop())
 
         members = torch.tensor([1 if v.in_platoon else 0 for v in state.vehicles])
         members[kick] = 0
@@ -264,10 +218,7 @@ class BasicDefenderAgent(DefenderAgent):
         members = members.nonzero().squeeze()
         members = members.numpy()
 
-        return DefenderAction(
-            members=frozenset(members),
-            # monitor=frozenset(monitor),
-        )
+        return DefenderAction(members=frozenset(members))
 
 class BasicAttackerAgent(AttackerAgent):
     def __init__(
@@ -478,10 +429,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
             members,
             proto_actions.members.heaviside(zerovalue)
         ))
-        return DefenderActionTensorBatch(
-            members=members,
-            # monitor=propose(proto_actions.monitor),
-        )
+        return DefenderActionTensorBatch(members=members)
 
     def save(self, dir: str, prefix: Optional[str] = None):
         path: pathlib.Path = pathlib.Path(dir)
