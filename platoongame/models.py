@@ -88,14 +88,14 @@ class DefenderActor(nn.Module):
         super(DefenderActor, self).__init__()
         
         self.vuln_conv = nn.LazyConv2d(
-            out_channels=32,
+            out_channels=128,
             kernel_size=5,
             stride=2
         )
         self.vuln_norm = nn.LazyBatchNorm2d()
         
         self.vehicle_conv = nn.LazyConv1d(
-            out_channels = 8,
+            out_channels=128,
             kernel_size=5,
             stride=1
         )
@@ -151,14 +151,14 @@ class DefenderCritic(nn.Module):
         super(DefenderCritic, self).__init__()
 
         self.vuln_conv = nn.LazyConv2d(
-            out_channels=8,
+            out_channels=128,
             kernel_size=5,
             stride=2
         )
         self.vuln_norm = nn.LazyBatchNorm2d()
         
         self.vehicle_conv = nn.LazyConv1d(
-            out_channels = 4,
+            out_channels = 128,
             kernel_size=2,
             stride=1
         )
