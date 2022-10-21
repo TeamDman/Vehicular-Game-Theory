@@ -56,6 +56,7 @@ class State:
             vehicles=torch.zeros(shape.vehicles),
         )
 
+        
 
 @dataclass
 class GameConfig:

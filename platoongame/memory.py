@@ -38,10 +38,10 @@ class TransitionTensorBatch:
 
     def to_device(self, device: torch.device) -> TransitionTensorBatch: 
         return TransitionTensorBatch(
-            state=self.state.to_device(device),
+            state=self.state.to(device),
             action=self.action.to_device(device),
             reward=self.reward.to(device),
-            next_state=self.next_state.to_device(device),
+            next_state=self.next_state.to(device),
             terminal=self.terminal.to(device),
         )
 

@@ -26,8 +26,8 @@ class DefenderAction:
         # monitor[list(self.monitor)] = 1
 
         return DefenderActionTensorBatch(
-            members=members.unsqueeze(dim=0).unsqueeze(dim=1),
-            # monitor=monitor.unsqueeze(dim=0).unsqueeze(dim=1),
+            members=members.unsqueeze(dim=0),
+            # monitor=monitor.unsqueeze(dim=0),
         )
 
 
@@ -408,6 +408,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
             mu=ou_mu,
             sigma=ou_sigma
         )
+        self.collapse_noise = torch.distributions.Normal(torch.as_tensor(0, dtype=torch.float32), torch.as_tensor(0.25, dtype=torch.float32))
         self.training = False
         self.epsilon = 1
         self.epsilon_decay = 1.0 / epsilon_decay_time
@@ -418,26 +419,21 @@ class WolpertingerDefenderAgent(DefenderAgent):
         state_obj: State
     ) -> DefenderAction:
         # convert from state object to tensors to be fed to the actor model
-        state = state_obj.as_tensor_batch(self.state_shape_data)
-        state = StateTensorBatch(
-            vulnerabilities=state.vulnerabilities.to(get_device()),
-            vehicles=state.vehicles.to(get_device()),
-        )
+        state = state_obj.as_tensor_batch(self.state_shape_data).to(get_device())
         
         # get action suggestions from the actor
         proto_actions: DefenderActionTensorBatch = self.actor(state)
-        assert proto_actions.batch_size == 1, "batch size must be 1"
+        assert proto_actions.batch_size == 1, "batch size should be one here"
         if self.training:
+            # apply epsilon noise
             proto_actions.members[0] += self.epsilon * self.random_process.sample().to(proto_actions.members.device)
+            # decay epsilon
             self.epsilon = max(0, self.epsilon-self.epsilon_decay)
 
         # convert proto actions to actual actions: -lt 0 => 0, -gt 0 => 1
         actions = self.collapse_proto_actions(proto_actions)
-
-        # should be a batch of 1
-        assert actions.members.shape[0] == 1
-        # assert actions.monitor.shape[0] == 1
-
+        # copy state tensors to apply to the multiple proposed actions
+        state = state.repeat(actions.batch_size)
         # grade the acctions using the critic
         action_q_values: torch.Tensor = self.critic(state, actions)
 
@@ -447,8 +443,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
 
         # convert binary vectors to vector of indices
         return DefenderAction(
-            members=frozenset(actions.members[0][best_action_index].cpu().nonzero().flatten().numpy()),
-            # monitor=frozenset(actions.monitor[0][best_action_index].cpu().nonzero().flatten().numpy()),
+            members=frozenset(actions.members[best_action_index].cpu().nonzero().flatten().numpy()),
         )
     
     def as_dict(self) -> Dict:
@@ -464,16 +459,27 @@ class WolpertingerDefenderAgent(DefenderAgent):
 
     # Converts latent action into multiple potential actions
     def collapse_proto_actions(self, proto_actions: DefenderActionTensorBatch) -> DefenderActionTensorBatch:
-        num_proposals = 5
-        def propose(t: torch.Tensor) -> torch.Tensor:
-            noise = torch.linspace(-0.5, +0.5, num_proposals).unsqueeze(dim=1).to(get_device())
-            rtn = t.repeat(1,num_proposals,1)
-            rtn += noise
-            zerovalue = torch.tensor(1.).to(get_device())
-            rtn = rtn.heaviside(zerovalue)
-            return rtn
+        members = proto_actions.members
+        assert len(members.shape) == 2 # [batch, member_binary_vectors]
+        num_proposals = 5 # hyper-parameter
+        batch_size, num_vehicles = members.shape
+        out_batch_size = batch_size * num_proposals
+        # create noise
+        noise = self.collapse_noise.sample(torch.Size((out_batch_size, num_vehicles))).to(get_device())
+        # copy members to receive different noise values
+        members = members.repeat(num_proposals,1)
+        # apply noise
+        members += noise
+        # convert to binary
+        zerovalue = torch.tensor(1.).to(get_device())
+        members = members.heaviside(zerovalue)
+        # also ensure that no-noise nearest lookup is performed
+        members = torch.cat((
+            members,
+            proto_actions.members.heaviside(zerovalue)
+        ))
         return DefenderActionTensorBatch(
-            members=propose(proto_actions.members),
+            members=members,
             # monitor=propose(proto_actions.monitor),
         )
 
