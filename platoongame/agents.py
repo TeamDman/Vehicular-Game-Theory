@@ -387,6 +387,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
         state = state.repeat(actions.batch_size)
         # grade the acctions using the critic
         action_q_values: torch.Tensor = self.critic(state, actions)
+        del state
 
         # find the best action
         best_action_index = action_q_values.argmax().cpu()
@@ -415,12 +416,12 @@ class WolpertingerDefenderAgent(DefenderAgent):
         num_proposals = 5 # hyper-parameter
         batch_size, num_vehicles = members.shape
         out_batch_size = batch_size * num_proposals
-        # create noise
-        noise = self.collapse_noise.sample(torch.Size((out_batch_size, num_vehicles))).to(get_device())
         # copy members to receive different noise values
         members = members.repeat(num_proposals,1)
-        # apply noise
+        # create and apply noise
+        noise = self.collapse_noise.sample(torch.Size((out_batch_size, num_vehicles))).to(get_device())
         members += noise
+        del noise
         # convert to binary
         zerovalue = torch.tensor(1.).to(get_device())
         members = members.heaviside(zerovalue)
@@ -429,6 +430,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
             members,
             proto_actions.members.heaviside(zerovalue)
         ))
+        del zerovalue
         return DefenderActionTensorBatch(members=members)
 
     def save(self, dir: str, prefix: Optional[str] = None):

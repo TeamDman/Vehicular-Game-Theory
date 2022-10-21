@@ -42,3 +42,4 @@ def sample_model_outputs(
     print("q_pred", q_values)
     print("batch.reward", batch.reward)
     print("pred reward err", q_values - batch.reward)
+    del batch

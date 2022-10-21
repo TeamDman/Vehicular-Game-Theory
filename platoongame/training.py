@@ -214,6 +214,7 @@ class WolpertingerDefenderAgentTrainer:
         ).to(get_device())
         batch.next_state.vehicles[terminal_indices] = zero_state.vehicles
         batch.next_state.vulnerabilities[terminal_indices] = zero_state.vulnerabilities
+        del zero_state
 
         assert batch.next_state.vulnerabilities.shape == batch.state.vulnerabilities.shape
         assert batch.next_state.vehicles.shape == batch.state.vehicles.shape
