@@ -112,7 +112,7 @@ class DefenderActor(nn.Module):
     # def init_weights(self):
     #     for m in self.modules():
     #         if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-    #             nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+    #             nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="gelu")
     #         elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
     #             nn.init.constant_(m.weight, 1)
     #             nn.init.constant_(m.bias, 0)
@@ -121,11 +121,11 @@ class DefenderActor(nn.Module):
         self,
         state: StateTensorBatch
     ) -> DefenderActionTensorBatch:
-        x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
-        x_a = F.relu(self.vuln_norm(x_a))
+        x_a = F.gelu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
+        x_a = F.gelu(self.vuln_norm(x_a))
 
-        x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
-        x_b = F.relu(self.vehicle_norm(x_b))
+        x_b = F.gelu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
+        x_b = F.gelu(self.vehicle_norm(x_b))
 
         x = torch.cat((
             x_a.flatten(start_dim=1),
@@ -134,9 +134,9 @@ class DefenderActor(nn.Module):
             state.vehicles.flatten(start_dim=1),
         ), dim=1)
         x = self.hidden1(x)
-        x = F.relu(x)
+        x = F.gelu(x)
         x = self.hidden2(x)
-        x = F.relu(x)
+        x = F.gelu(x)
 
         members_proto = torch.tanh(self.member_head(x))
 
@@ -183,11 +183,11 @@ class DefenderCritic(nn.Module):
         # state and action batch sizes should match
         assert state.vehicles.shape[0] == actions.members.shape[0]
 
-        x_a = F.relu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
-        x_a = F.relu(self.vuln_norm(x_a))
+        x_a = F.gelu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
+        x_a = F.gelu(self.vuln_norm(x_a))
 
-        x_b = F.relu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
-        x_b = F.relu(self.vehicle_norm(x_b))
+        x_b = F.gelu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
+        x_b = F.gelu(self.vehicle_norm(x_b))
 
         x_c = actions.members
 
@@ -200,8 +200,8 @@ class DefenderCritic(nn.Module):
         ), dim=1)
 
         x = self.hidden1(x)
-        x = F.relu(x)
+        x = F.gelu(x)
         x = self.hidden2(x)
-        x = F.relu(x)
+        x = F.gelu(x)
         x = self.score(x)
         return x.flatten()
