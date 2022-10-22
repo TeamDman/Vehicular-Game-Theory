@@ -41,6 +41,7 @@ class WolpertingerDefenderAgentTrainerConfig:
     update_policy_interval: int
     train_interval: int
     checkpoint_interval: Union[int, None]
+    attacker_headstart: int
     policy_update_type: str
 
     metrics_tracker: TrainingMetricsTracker
@@ -57,6 +58,7 @@ class WolpertingerDefenderAgentTrainerConfig:
             "warmup_steps": self.warmup_replay,
             "max_steps_per_episode": self.max_steps_per_episode,
             "defender_agent": str(self.defender_agent),
+            "attacker_headstart": self.attacker_headstart,
             "defender_config": self.defender_agent.as_dict(),
             "attacker_agent": str(self.attacker_agent),
             "update_policy_interval": self.update_policy_interval,
@@ -107,6 +109,10 @@ class WolpertingerDefenderAgentTrainer:
 
     def prepare_next_episode(self) -> None:
         self.game = Game(config=self.config.game_config, vehicle_provider=self.config.vehicle_provider)
+        # have the attacker get a free starting action to ensure the defender can generalize
+        # my theory is that having a starting state with no compromises is not good for the defender's ability to learn
+        for _ in range(self.config.attacker_headstart):
+            self.game.state = self.config.attacker_agent.take_action(self.game.state, self.config.attacker_agent.get_action(self.game.state))
         self.prev_state = self.game.state
         self.episode_step = 0
         self.episode += 1
