@@ -95,7 +95,6 @@ class OptimizationResult:
 
 class WolpertingerDefenderAgentTrainer:
     game: Game
-    prev_state: State
     step: int
     optim_step: int
     episode: int
@@ -113,11 +112,12 @@ class WolpertingerDefenderAgentTrainer:
         # my theory is that having a starting state with no compromises is not good for the defender's ability to learn
         for _ in range(self.config.attacker_headstart):
             self.game.state = self.config.attacker_agent.take_action(self.game.state, self.config.attacker_agent.get_action(self.game.state))
-        self.prev_state = self.game.state
+
         self.episode_step = 0
         self.episode += 1
 
     def take_explore_step(self, random: bool) -> float: # returns reward
+        prev_state = self.game.state
         _, defender_action = self.game.take_step(
             attacker_agent=self.config.attacker_agent,
             defender_agent=self.config.defender_agent if not random else self.random_defender_agent
@@ -125,7 +125,7 @@ class WolpertingerDefenderAgentTrainer:
         reward = self.config.defender_agent.get_utility(self.game.state)
         next_state = self.game.state
         transition = Transition(
-            state=self.prev_state,
+            state=prev_state,
             next_state=next_state,
             action=defender_action,
             reward=reward,
@@ -136,8 +136,6 @@ class WolpertingerDefenderAgentTrainer:
         if self.episode_step == self.config.max_steps_per_episode - 1:
             self.prepare_next_episode()
         else:
-            assert next_state is not None
-            self.prev_state = next_state
             self.episode_step += 1
         
         return reward
