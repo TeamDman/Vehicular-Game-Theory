@@ -58,7 +58,8 @@ class State:
 @dataclass
 class GameConfig:
     max_vehicles: int
-    cycle_every: Union[int,None]
+    cycle_enabled: bool
+    cycle_every: int
     cycle_num: int
     cycle_allow_platoon: bool
 
@@ -102,7 +103,7 @@ class Game:
         return attacker_action, defender_action
 
     def cycle(self) -> None:
-        if self.config.cycle_every is not None and self.step % self.config.cycle_every == 0:
+        if self.config.cycle_enabled and self.step % self.config.cycle_every == 0:
             remove = set()
             candidates = list([(i,v) for i,v in enumerate(self.state.vehicles) if not v.in_platoon or self.config.cycle_allow_platoon])
             self.logger.info(f"cycling out {len(candidates)} of {self.config.cycle_num} allowed vehicles")

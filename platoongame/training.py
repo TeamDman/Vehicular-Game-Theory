@@ -39,7 +39,7 @@ class WolpertingerDefenderAgentTrainerConfig:
     defender_agent: WolpertingerDefenderAgent
     attacker_agent: AttackerAgent
     update_policy_interval: int
-    train_interval: int
+    exploration_per_step: int
     checkpoint_interval: Union[int, None]
     attacker_headstart: int
     policy_update_type: str
@@ -164,12 +164,8 @@ class WolpertingerDefenderAgentTrainer:
         self.step += 1
         self.optim_step += 1
 
-    def train(self) -> None:
-        self.episode = 0
-        self.optim_step = 0
-        self.step = 0
+    def warmup(self) -> None:
         self.prepare_next_episode()
-
         print("Warming up...")
         # desired minimum replay size after warmup
         warmup_steps = max(self.config.warmup_replay, self.config.batch_size)
@@ -182,9 +178,10 @@ class WolpertingerDefenderAgentTrainer:
             self.step += 1
         print("Warmup complete~!")
 
-        # arbitrary number, but we need to be sure there are enough transitions that have rewards
-        # lost a lot of time debugging because of this
-        assert sum([e.reward for e in self.config.memory.sample(min(1000, len(self.config.memory)))]) > 100
+    def train(self) -> None:
+        self.episode = 0
+        self.optim_step = 0
+        self.step = 0
 
         # ensure the agent knows to use epsilon decay
         self.config.defender_agent.training = True
@@ -195,7 +192,7 @@ class WolpertingerDefenderAgentTrainer:
             # exploration between optimization steps
             rewards = [
                 self.take_explore_step(random=False)
-                for _ in range(self.config.train_interval)
+                for _ in range(self.config.exploration_per_step)
             ]
             print(f"reward={{max={max(rewards):07.4f}, min={min(rewards):07.4f}, mean={sum(rewards)/len(rewards):07.4f}}} ", end="")
 

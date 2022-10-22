@@ -88,7 +88,11 @@ class TrainingMetricsTracker:
     def plot(self, loss_threshold: Optional[float] = None) -> None:
         if loss_threshold is not None:
             from itertools import takewhile
-            TrainingMetricsTracker(stats=list(takewhile(lambda entry: entry.optim.loss <= loss_threshold, self.stats[::-1]))[::-1]).plot()
+            stats = list(takewhile(lambda entry: entry.optim.loss <= loss_threshold, self.stats[::-1]))[::-1]
+            if len(stats) == 0:
+                print(f"No stats to plot below loss threshold {loss_threshold}")
+            else:
+                TrainingMetricsTracker(stats=stats).plot()
             return
         self.set_margins()
         self.plot_loss()
