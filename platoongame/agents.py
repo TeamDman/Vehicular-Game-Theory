@@ -447,6 +447,6 @@ class WolpertingerDefenderAgent(DefenderAgent):
         path = pathlib.Path(dir)
         models = ["actor", "actor_target", "critic", "critic_target"]
         for model in models:
-            path = path / f"{prefix} {model}.pt"
-            getattr(self,model).load_state_dict(torch.load(path, map_location=get_device()))
+            modelpath = path / f"{prefix} {model}.pt"
+            getattr(self,model).load_state_dict(torch.load(modelpath, map_location=get_device()))
  
