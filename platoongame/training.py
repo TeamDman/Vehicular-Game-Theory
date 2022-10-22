@@ -140,7 +140,7 @@ class WolpertingerDefenderAgentTrainer:
     def take_optim_step(self) -> None:
         print("optimizing ", end="")
         optim = self.optimize_policy()
-        print(f"loss={optim.loss:.4f} diff={{max={optim.diff_max:.4f}, min={optim.diff_min:.4f}, mean={optim.diff_mean:.4f}}} policy_loss={optim.policy_loss:.4f} ", end="")
+        print(f"loss={optim.loss:07.4f} diff={{max={optim.diff_max:07.4f}, min={optim.diff_min:07.4f}, mean={optim.diff_mean:07.4f}}} policy_loss={optim.policy_loss:07.4f} ", end="")
         if optim.policy_updated:
             print("policy updated! ", end="")
         self.config.metrics_tracker.track_stats(
@@ -193,7 +193,7 @@ class WolpertingerDefenderAgentTrainer:
                 self.take_explore_step(random=False)
                 for _ in range(self.config.train_interval)
             ]
-            print(f"reward={{max={max(rewards):.4f}, min={min(rewards):.4f}, mean={sum(rewards)/len(rewards):.4f}}} ", end="")
+            print(f"reward={{max={max(rewards):07.4f}, min={min(rewards):07.4f}, mean={sum(rewards)/len(rewards):07.4f}}} ", end="")
 
             self.take_optim_step()
 
