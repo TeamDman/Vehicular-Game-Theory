@@ -1,30 +1,23 @@
-from dataclasses import dataclass, field
-import dataclasses
-from enum import Enum
+from dataclasses import dataclass
 import pathlib
-from symbol import term
-import time
-from typing import Dict, List, Union
-from warnings import warn
-from metrics import EpisodeMetricsTracker, EpisodeMetricsEntry, TrainingMetricsTracker
-from game import Game, GameConfig, State, StateTensorBatch
+from torch import Tensor
+from typing import Dict, Union
+from metrics import TrainingMetricsTracker
+from game import Game, GameConfig, StateTensorBatch
 
-from memory import DequeReplayMemory, ReplayMemory, Transition, TransitionTensorBatch
+from memory import ReplayMemory, Transition, TransitionTensorBatch
 import torch
-import random
 import math
-from agents import Action, AttackerAgent, DefenderAction, DefenderActionTensorBatch, RandomDefenderAgent, WolpertingerDefenderAgent, Agent
+from agents import AttackerAgent, DefenderActionTensorBatch, RandomDefenderAgent, WolpertingerDefenderAgent
 
 import json 
 
-import numpy as np
-from utils import get_device, get_prefix
+from utils import get_device
 import utils
 from tqdm.notebook import tqdm
 
-import matplotlib.pyplot as plt
 
-from vehicles import VehicleProvider, Vulnerability
+from vehicles import VehicleProvider
 
 criterion = torch.nn.MSELoss()
 # PolicyUpdateType = Union["soft","hard"]
@@ -225,24 +218,29 @@ class WolpertingerDefenderAgentTrainer:
         assert batch.next_state.vulnerabilities.shape == batch.state.vulnerabilities.shape
         assert batch.next_state.vehicles.shape == batch.state.vehicles.shape
 
+        # get proto actions for the next states
+        proto_actions:DefenderActionTensorBatch = self.config.defender_agent.actor_target(batch.next_state)
+        assert proto_actions.members.shape == (self.config.batch_size, shape_data.num_vehicles)
+
+        # get the evaluation of the proto actions in their state
         with torch.no_grad():
-            # get proto actions for the next states
-            proto_actions:DefenderActionTensorBatch = self.config.defender_agent.actor_target(batch.next_state)
-            assert proto_actions.members.shape == (self.config.batch_size, shape_data.num_vehicles)
+            next_q_values: Tensor = self.config.defender_agent.critic_target(batch.next_state, proto_actions)
+        next_q_values.requires_grad_()
 
-            # get the evaluation of the proto actions in their state
-            next_q_values = self.config.defender_agent.critic_target(batch.next_state, proto_actions)
-            # for each batch (which has 1 proto action), there should be 1 q value
-            assert next_q_values.shape == (self.config.batch_size,)
+        # for each batch (which has 1 proto action), there should be 1 q value
+        assert next_q_values.shape == (self.config.batch_size,)
 
-            # boolean vector indicating states that aren't terminal
-            non_terminal_indices = ~terminal_indices
-            
-            # target q is initialized from the actual observed reward
-            target_q_batch = batch.reward.clone()
-            # target q is increased by discounted predicted future reward
-            target_q_batch[non_terminal_indices] += self.config.reward_gamma * next_q_values[non_terminal_indices]
-            assert target_q_batch.shape == (self.config.batch_size,)
+        # boolean vector indicating states that aren't terminal
+        non_terminal_indices = ~terminal_indices
+        
+        # target q is initialized from the actual observed reward
+        target_q_batch = batch.reward.clone()
+        # target q is increased by discounted predicted future reward
+        # todo: optimize so we don't compute next q values for terminal states
+        target_q_batch[non_terminal_indices] += self.config.reward_gamma * next_q_values[non_terminal_indices]
+        assert target_q_batch.shape == (self.config.batch_size,)
+
+
 
         #region critic update
         # reset the gradients
@@ -253,6 +251,7 @@ class WolpertingerDefenderAgentTrainer:
         # get the loss for the predicted grades
         value_loss: torch.Tensor = criterion(q_batch, target_q_batch)
         diff = (q_batch - target_q_batch).abs()
+        del target_q_batch
 
         # track the loss to model weights
         value_loss.backward()
