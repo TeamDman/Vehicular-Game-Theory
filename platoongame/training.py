@@ -111,7 +111,7 @@ class WolpertingerDefenderAgentTrainer:
         self.episode_step = 0
         self.episode += 1
 
-    def take_explore_step(self, random: bool) -> None:
+    def take_explore_step(self, random: bool) -> float: # returns reward
         _, defender_action = self.game.take_step(
             attacker_agent=self.config.attacker_agent,
             defender_agent=self.config.defender_agent if not random else self.random_defender_agent
@@ -133,11 +133,11 @@ class WolpertingerDefenderAgentTrainer:
             assert next_state is not None
             self.prev_state = next_state
             self.episode_step += 1
+        
+        return reward
 
 
     def take_optim_step(self) -> None:
-        print(f"{get_prefix()} episode {self.episode} step {self.episode_step} ", end="")
-
         print("optimizing ", end="")
         optim = self.optimize_policy()
         print(f"loss={optim.loss:.4f} diff={{max={optim.diff_max:.4f}, min={optim.diff_min:.4f}, mean={optim.diff_mean:.4f}}} policy_loss={optim.policy_loss:.4f} ", end="")
@@ -184,11 +184,16 @@ class WolpertingerDefenderAgentTrainer:
 
         # ensure the agent knows to use epsilon decay
         self.config.defender_agent.training = True
+        digits = math.ceil(math.log10(self.config.train_steps))
+        for i in tqdm(range(self.config.train_steps)):
+            print(f"train step {i:0{digits}d} ", end="")
 
-        for _ in tqdm(range(self.config.train_steps)):
             # exploration between optimization steps
-            for _ in range(self.config.train_interval):
+            rewards = [
                 self.take_explore_step(random=False)
+                for _ in range(self.config.train_interval)
+            ]
+            print(f"reward={{max={max(rewards):.4f}, min={min(rewards):.4f}, mean={sum(rewards)/len(rewards):.4f}}} ", end="")
 
             self.take_optim_step()
 
