@@ -186,7 +186,7 @@ class WolpertingerDefenderAgentTrainer:
 
         # arbitrary number, but we need to be sure there are enough transitions that have rewards
         # lost a lot of time debugging because of this
-        assert sum([e.reward for e in self.config.memory.sample(1000)]) > 100
+        assert sum([e.reward for e in self.config.memory.sample(min(1000, len(self.config.memory)))]) > 100
 
         # ensure the agent knows to use epsilon decay
         self.config.defender_agent.training = True
