@@ -413,7 +413,7 @@ class WolpertingerDefenderAgent(DefenderAgent):
     def collapse_proto_actions(self, proto_actions: DefenderActionTensorBatch) -> DefenderActionTensorBatch:
         members = proto_actions.members
         assert len(members.shape) == 2 # [batch, member_binary_vectors]
-        num_proposals = 5 # hyper-parameter
+        num_proposals = self.num_proposals # hyper-parameter
         batch_size, num_vehicles = members.shape
         out_batch_size = batch_size * num_proposals
         # copy members to receive different noise values
