@@ -165,6 +165,9 @@ class WolpertingerDefenderAgentTrainer:
         self.optim_step += 1
 
     def warmup(self) -> None:
+        self.episode = 0
+        self.optim_step = 0
+        self.step = 0
         self.prepare_next_episode()
         print("Warming up...")
         # desired minimum replay size after warmup
@@ -179,10 +182,7 @@ class WolpertingerDefenderAgentTrainer:
         print("Warmup complete~!")
 
     def train(self) -> None:
-        self.episode = 0
-        self.optim_step = 0
-        self.step = 0
-
+        self.warmup()
         # ensure the agent knows to use epsilon decay
         self.config.defender_agent.training = True
         digits = math.ceil(math.log10(self.config.train_steps))
