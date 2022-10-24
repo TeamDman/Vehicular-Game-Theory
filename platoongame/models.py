@@ -137,11 +137,12 @@ class DefenderActor(nn.Module):
         x = F.gelu(x)
         x = self.hidden2(x)
         x = F.gelu(x)
-
-        members_proto = torch.tanh(self.member_head(x))
+        x = self.member_head(x)
+        x *= 2 # scale up to avoid numerical issues, we want it to be close to 0 or 1
+        x = torch.tanh(x)
 
         return DefenderActionTensorBatch(
-            members=members_proto,
+            members=x,
         )
 
 class DefenderCritic(nn.Module):
