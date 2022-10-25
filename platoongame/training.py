@@ -247,7 +247,7 @@ class WolpertingerDefenderAgentTrainer:
 
         # actor loss goes down as the critic makes better assessments of the proposed actions
         self.config.defender_agent.actor.zero_grad()
-        policy_loss: torch.Tensor = -1 * self.config.defender_agent.critic(batch.state, self.config.defender_agent.actor_target(batch.state)).mean()
+        policy_loss: torch.Tensor = -1 * self.config.defender_agent.critic(batch.state, self.config.defender_agent.actor(batch.state)).mean()
         policy_loss.backward()
         self.config.defender_agent.actor_optimizer.step()
 
