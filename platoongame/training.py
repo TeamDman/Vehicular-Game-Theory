@@ -201,89 +201,68 @@ class WolpertingerDefenderAgentTrainer:
         batch = TransitionTensorBatch.cat(batch).to(get_device())
         shape_data = self.config.defender_agent.state_shape_data
             
-        
         assert batch.state.vulnerabilities.shape == (self.config.batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)
-
+        assert batch.next_state.vulnerabilities.shape == batch.state.vulnerabilities.shape
         assert batch.action.members.shape == (self.config.batch_size, shape_data.num_vehicles)
-
         assert batch.reward.shape == (self.config.batch_size,)
         assert batch.terminal.shape == (self.config.batch_size,)
 
+        # zero out state for terminal transitions
         terminal_indices = batch.terminal == True
-        zero_state = StateTensorBatch.zeros(
-            shape_data=shape_data,
-            batch_size=int(terminal_indices.sum())
-        ).to(get_device())
-        batch.next_state.vulnerabilities[terminal_indices] = zero_state.vulnerabilities
-        del zero_state
-
-        assert batch.next_state.vulnerabilities.shape == batch.state.vulnerabilities.shape
-
-        # get proto actions for the next states
-        proto_actions:DefenderActionTensorBatch = self.config.defender_agent.actor_target(batch.next_state)
-        assert proto_actions.members.shape == (self.config.batch_size, shape_data.num_vehicles)
-
-        # get the evaluation of the proto actions in their state
-        with torch.no_grad():
-            next_q_values: Tensor = self.config.defender_agent.critic_target(batch.next_state, proto_actions)
-        next_q_values.requires_grad_()
-
-        # for each batch (which has 1 proto action), there should be 1 q value
-        assert next_q_values.shape == (self.config.batch_size,)
-
-        # boolean vector indicating states that aren't terminal
         non_terminal_indices = ~terminal_indices
-        
-        # target q is initialized from the actual observed reward
-        target_q_batch = batch.reward.clone()
-        # target q is increased by discounted predicted future reward
-        # todo: optimize so we don't compute next q values for terminal states
-        target_q_batch[non_terminal_indices] += self.config.reward_gamma * next_q_values[non_terminal_indices]
-        assert target_q_batch.shape == (self.config.batch_size,)
+        zero_state = StateTensorBatch.zeros(shape_data=shape_data, batch_size=int(terminal_indices.sum())).to(get_device())
+        batch.next_state.vulnerabilities[terminal_indices] = zero_state.vulnerabilities
 
+        # # calculate q value for next state
+        # proto_actions:DefenderActionTensorBatch = self.config.defender_agent.actor_target(batch.next_state)
+        # assert proto_actions.members.shape == (self.config.batch_size, shape_data.num_vehicles)
+        # with torch.no_grad():
+        #     next_q_values: Tensor = self.config.defender_agent.critic_target(batch.next_state, proto_actions)
+        #     assert next_q_values.shape == (self.config.batch_size,)
+        # next_q_values.requires_grad_()
 
+        # # target q is discounted future reward calculated using q values from critic assessment of actor's action
+        # target_q_batch = batch.reward.clone()
+        # target_q_batch[non_terminal_indices] += self.config.reward_gamma * next_q_values[non_terminal_indices]
+        # assert target_q_batch.shape == (self.config.batch_size,)
 
-        #region critic update
-        # reset the gradients
+        # self.config.defender_agent.critic.zero_grad()
+        # q_batch = self.config.defender_agent.critic(batch.state, batch.action)
+        # assert q_batch.shape == (self.config.batch_size,)
+        # # critic should be predicting reward considering the discounted future reward
+        # value_loss: torch.Tensor = criterion(q_batch, target_q_batch)
+        # value_loss.backward()
+        # self.config.defender_agent.critic_optimizer.step()
+
+        # critic loss goes down as it makes better predictions of immediate reward
+        # future reward discounts aren't needed since the game isn't stateful
         self.config.defender_agent.critic.zero_grad()
-        # predict/grade the proposed actions
-        q_batch = self.config.defender_agent.critic(batch.state, batch.action)
+        q_batch = self.config.defender_agent.critic_target(batch.state, batch.action)
         assert q_batch.shape == (self.config.batch_size,)
-        # get the loss for the predicted grades
-        value_loss: torch.Tensor = criterion(q_batch, target_q_batch)
-        diff = (q_batch - target_q_batch).abs()
-        del target_q_batch
-
-        # track the loss to model weights
+        assert batch.reward.shape == (self.config.batch_size,)
+        value_loss: Tensor = criterion(q_batch, batch.reward)
         value_loss.backward()
-        # apply model weight update
         self.config.defender_agent.critic_optimizer.step()
-        #endregion critic update
+        
 
-        #region actor update
-        # reset the gradients
+        # actor loss goes down as the critic makes better assessments of the proposed actions
         self.config.defender_agent.actor.zero_grad()
-        # get proposed actions from actor, then get the critic to grade them
-        # loss goes down as the critic makes better assessments of the proposed actions
-        policy_loss: torch.Tensor = -1 * self.config.defender_agent.critic(batch.state, self.config.defender_agent.actor(batch.state))
-        # ensure the actor proposes mostly good (according to the critic) actions
-        policy_loss = policy_loss.mean()
-        # back propagate the loss to the model weights
+        policy_loss: torch.Tensor = -1 * self.config.defender_agent.critic(batch.state, self.config.defender_agent.actor_target(batch.state)).mean()
         policy_loss.backward()
-        # apply model weight update
         self.config.defender_agent.actor_optimizer.step()
-        #endregion actor update
 
-        # Soft update wasn't training fast, trying hard update
         should_update_policy = self.optim_step % self.config.update_policy_interval == 0
         if should_update_policy:
             if self.config.policy_update_type == "soft":
                 # from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26
                 def soft_update(target, source, tau):
                     for target_param, param in zip(target.parameters(), source.parameters()):
-                        target_param.data.copy_(
-                            target_param.data * (1.0 - tau) + param.data * tau
-                        )
+                        ## shouldn't be necessary since we use target networks to calculate loss
+                        # if isinstance(target_param, torch.nn.parameter.UninitializedParameter):
+                        #     # target model uninitialize, hard update
+                        #     target_param.data.copy_(param.data)
+                        # else:
+                        target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
                 soft_update(self.config.defender_agent.actor_target, self.config.defender_agent.actor, self.config.soft_update_tau)
                 soft_update(self.config.defender_agent.critic_target, self.config.defender_agent.critic, self.config.soft_update_tau)
             elif self.config.policy_update_type == "hard":
@@ -292,7 +271,9 @@ class WolpertingerDefenderAgentTrainer:
             else:
                 raise ValueError(f"unknown policy update type: \"{self.config.policy_update_type}\"")
 
-        return OptimizationResult(
+
+        diff = (q_batch - batch.reward).abs()
+        rtn = OptimizationResult(
             loss=float(value_loss.detach().cpu().numpy()),
             diff_max = float(diff.max().detach().cpu().numpy()),
             diff_min = float(diff.min().detach().cpu().numpy()),
@@ -301,3 +282,11 @@ class WolpertingerDefenderAgentTrainer:
             policy_updated=should_update_policy,
         )
         
+        # del target_q_batch
+        del q_batch
+        del zero_state
+        del terminal_indices
+        del non_terminal_indices
+        del diff
+
+        return rtn
