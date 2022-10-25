@@ -251,7 +251,7 @@ class WolpertingerDefenderAgentTrainer:
         policy_loss.backward()
         self.config.defender_agent.actor_optimizer.step()
 
-        # should_update_policy = self.optim_step % self.config.update_policy_interval == 0
+        should_update_policy = self.optim_step % self.config.update_policy_interval == 0
         # if should_update_policy:
         #     if self.config.policy_update_type == "soft":
         #         # from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26
