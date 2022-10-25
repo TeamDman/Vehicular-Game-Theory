@@ -237,7 +237,7 @@ class WolpertingerDefenderAgentTrainer:
         # critic loss goes down as it makes better predictions of immediate reward
         # future reward discounts aren't needed since the game isn't stateful
         self.config.defender_agent.critic.zero_grad()
-        q_batch = self.config.defender_agent.critic_target(batch.state, batch.action)
+        q_batch = self.config.defender_agent.critic(batch.state, batch.action)
         assert q_batch.shape == (self.config.batch_size,)
         assert batch.reward.shape == (self.config.batch_size,)
         value_loss: Tensor = criterion(q_batch, batch.reward)
@@ -251,25 +251,25 @@ class WolpertingerDefenderAgentTrainer:
         policy_loss.backward()
         self.config.defender_agent.actor_optimizer.step()
 
-        should_update_policy = self.optim_step % self.config.update_policy_interval == 0
-        if should_update_policy:
-            if self.config.policy_update_type == "soft":
-                # from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26
-                def soft_update(target, source, tau):
-                    for target_param, param in zip(target.parameters(), source.parameters()):
-                        ## shouldn't be necessary since we use target networks to calculate loss
-                        # if isinstance(target_param, torch.nn.parameter.UninitializedParameter):
-                        #     # target model uninitialize, hard update
-                        #     target_param.data.copy_(param.data)
-                        # else:
-                        target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
-                soft_update(self.config.defender_agent.actor_target, self.config.defender_agent.actor, self.config.soft_update_tau)
-                soft_update(self.config.defender_agent.critic_target, self.config.defender_agent.critic, self.config.soft_update_tau)
-            elif self.config.policy_update_type == "hard":
-                self.config.defender_agent.actor_target.load_state_dict(self.config.defender_agent.actor.state_dict())
-                self.config.defender_agent.critic_target.load_state_dict(self.config.defender_agent.critic.state_dict())
-            else:
-                raise ValueError(f"unknown policy update type: \"{self.config.policy_update_type}\"")
+        # should_update_policy = self.optim_step % self.config.update_policy_interval == 0
+        # if should_update_policy:
+        #     if self.config.policy_update_type == "soft":
+        #         # from https://github.com/ghliu/pytorch-ddpg/blob/master/util.py#L26
+        #         def soft_update(target, source, tau):
+        #             for target_param, param in zip(target.parameters(), source.parameters()):
+        #                 ## shouldn't be necessary since we use target networks to calculate loss
+        #                 # if isinstance(target_param, torch.nn.parameter.UninitializedParameter):
+        #                 #     # target model uninitialize, hard update
+        #                 #     target_param.data.copy_(param.data)
+        #                 # else:
+        #                 target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
+        #         soft_update(self.config.defender_agent.actor_target, self.config.defender_agent.actor, self.config.soft_update_tau)
+        #         soft_update(self.config.defender_agent.critic_target, self.config.defender_agent.critic, self.config.soft_update_tau)
+        #     elif self.config.policy_update_type == "hard":
+        #         self.config.defender_agent.actor_target.load_state_dict(self.config.defender_agent.actor.state_dict())
+        #         self.config.defender_agent.critic_target.load_state_dict(self.config.defender_agent.critic.state_dict())
+        #     else:
+        #         raise ValueError(f"unknown policy update type: \"{self.config.policy_update_type}\"")
 
 
         diff = (q_batch - batch.reward).abs()
