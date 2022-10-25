@@ -29,17 +29,3 @@ def get_episode_metrics(
             metrics.track_stats(game)
 
         return metrics
-
-def sample_model_outputs(
-    defender_agent: WolpertingerDefenderAgent,
-    memory: ReplayMemory
-) -> None:
-    batch = TransitionTensorBatch.cat(memory.sample(10)).to(get_device())
-
-    proto_actions = defender_agent.actor(batch.state)
-    print("action.members", proto_actions.members.sum(dim=0))
-    q_values = defender_agent.critic(batch.state, proto_actions)
-    print("q_pred", q_values)
-    print("batch.reward", batch.reward)
-    print("pred reward err", q_values - batch.reward)
-    del batch

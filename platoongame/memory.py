@@ -55,6 +55,11 @@ class TransitionTensorBatch:
             terminal=torch.cat([v.terminal for v in items]),
         )
 
+    @property
+    def batch_size(self) -> int:
+        assert self.state.batch_size == self.action.batch_size == self.reward.shape[0] == self.next_state.batch_size == self.terminal.shape[0]
+        return self.state.batch_size
+
 T = TypeVar("T")
 class ReplayMemory(ABC, Generic[T]):
     def __init__(self) -> None:

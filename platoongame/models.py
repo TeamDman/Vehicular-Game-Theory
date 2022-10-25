@@ -20,33 +20,32 @@ class StateShapeData:
 @dataclass(frozen=True)
 class StateTensorBatch:
     vulnerabilities: torch.Tensor# (BatchSize, Vehicle, Vuln, VulnFeature)
-    vehicles: torch.Tensor# (BatchSize, Vehicle, VehicleFeature)
 
     def to(self, device: torch.device) -> StateTensorBatch:
         return StateTensorBatch(
             vulnerabilities=self.vulnerabilities.to(device),
-            vehicles=self.vehicles.to(device),
         )
 
     @staticmethod
     def cat(items: List[StateTensorBatch]) -> StateTensorBatch:
         return StateTensorBatch(
             vulnerabilities=torch.cat([v.vulnerabilities for v in items]),
-            vehicles=torch.cat([v.vehicles for v in items]),
         )
     
     @staticmethod
     def zeros(shape_data: StateShapeData, batch_size: int) -> StateTensorBatch:
         return StateTensorBatch(
             vulnerabilities=torch.zeros((batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)),
-            vehicles=torch.zeros((batch_size, shape_data.num_vehicles, shape_data.num_vehicle_features)),
         )
 
     def repeat(self, times: int) -> StateTensorBatch:
         return StateTensorBatch(
-            vehicles=self.vehicles.repeat((times, 1, 1)),
             vulnerabilities=self.vulnerabilities.repeat((times, 1, 1, 1)),
         )
+
+    @property
+    def batch_size(self) -> int:
+        return self.vulnerabilities.shape[0]
 
 
 @dataclass(frozen=True)
@@ -61,6 +60,11 @@ class DefenderActionTensorBatch:
     def cat(items: List[DefenderActionTensorBatch]) -> DefenderActionTensorBatch:
         return DefenderActionTensorBatch(
             members=torch.cat([v.members for v in items]),
+        )
+
+    def as_binary(self) -> DefenderActionTensorBatch:
+        return DefenderActionTensorBatch(
+            members=(self.members > 0.5).float(),
         )
 
     @property
@@ -96,13 +100,6 @@ class DefenderActor(nn.Module):
         )
         self.vuln_norm = nn.LazyBatchNorm2d()
         
-        self.vehicle_conv = nn.LazyConv1d(
-            out_channels=128,
-            kernel_size=5,
-            stride=1
-        )
-        self.vehicle_norm = nn.LazyBatchNorm1d()
-
         self.hidden1 = nn.LazyLinear(out_features = 10000)
         self.hidden2 = nn.LazyLinear(out_features = 1000)
 
@@ -123,25 +120,20 @@ class DefenderActor(nn.Module):
         self,
         state: StateTensorBatch
     ) -> DefenderActionTensorBatch:
-        x_a = F.gelu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
-        x_a = F.gelu(self.vuln_norm(x_a))
-
-        x_b = F.gelu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
-        x_b = F.gelu(self.vehicle_norm(x_b))
+        x = F.gelu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
+        x = F.gelu(self.vuln_norm(x))
 
         x = torch.cat((
-            x_a.flatten(start_dim=1),
-            x_b.flatten(start_dim=1),
+            x.flatten(start_dim=1),
             state.vulnerabilities.flatten(start_dim=1),
-            state.vehicles.flatten(start_dim=1),
         ), dim=1)
         x = self.hidden1(x)
         x = F.gelu(x)
         x = self.hidden2(x)
         x = F.gelu(x)
         x = self.member_head(x)
-        x *= 2 # scale up to avoid numerical issues, we want it to be close to 0 or 1
-        x = torch.tanh(x)
+        # x /= 10
+        x = F.sigmoid(x)
 
         return DefenderActionTensorBatch(
             members=x,
@@ -176,31 +168,16 @@ class DefenderCritic(nn.Module):
         state: StateTensorBatch, # the state as context for the action
         actions: DefenderActionTensorBatch, # the action that is being graded
     ) -> torch.Tensor: # returns Q value (rating of the action)
-        assert len(state.vehicles.shape) == 3 # [batch, vehicle, vehicle_features]
         assert len(state.vulnerabilities.shape) == 4 # [batch, vehicle, vuln, vuln_features]
         assert len(actions.members.shape) == 2 # [batch, binary_member_vectors]
 
-
-        # vehicles and vulnerability batch sizes should match
-        assert state.vehicles.shape[0] == state.vulnerabilities.shape[0]
-        # state and action batch sizes should match
-        assert state.vehicles.shape[0] == actions.members.shape[0]
-
-        x_a = F.gelu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
-        x_a = F.gelu(self.vuln_norm(x_a))
-
-        x_b = state.vehicles
-        # x_b = F.gelu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
-        # x_b = F.gelu(self.vehicle_norm(x_b))
-
-        x_c = actions.members
+        x_states = F.gelu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
+        x_states = F.gelu(self.vuln_norm(x_states))
 
         x = torch.cat((
-            x_a.flatten(start_dim=1),
-            x_b.flatten(start_dim=1),
-            x_c.flatten(start_dim=1),
+            x_states.flatten(start_dim=1),
             state.vulnerabilities.flatten(start_dim=1),
-            state.vehicles.flatten(start_dim=1),
+            actions.members,
         ), dim=1)
 
         x = self.hidden1(x)

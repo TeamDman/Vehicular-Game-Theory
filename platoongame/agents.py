@@ -431,16 +431,13 @@ class WolpertingerDefenderAgent(DefenderAgent):
         noise = self.collapse_noise.sample(torch.Size((out_batch_size, num_vehicles))).to(get_device())
         members += noise
         del noise
-        # convert to binary
-        zerovalue = torch.tensor(1.).to(get_device())
-        members = members.heaviside(zerovalue)
         # also ensure that no-noise nearest lookup is performed
         members = torch.cat((
             members,
-            proto_actions.members.heaviside(zerovalue)
+            proto_actions.members
         ))
-        del zerovalue
-        return DefenderActionTensorBatch(members=members)
+        # convert to binary and return
+        return DefenderActionTensorBatch(members=members).as_binary()
 
     def save(self, dir: str, prefix: Optional[str] = None):
         path: pathlib.Path = pathlib.Path(dir)

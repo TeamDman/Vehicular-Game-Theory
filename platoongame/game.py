@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class StateTensorBatchShape:
     vulnerabilities: Tuple[int,int,int,int]
-    vehicles: Tuple[int,int,int]
 
 @dataclass(frozen=True)
 class State:
@@ -28,21 +27,17 @@ class State:
     def as_tensor_batch(self, shape_data: StateShapeData) -> StateTensorBatch:
         shape = State.get_shape(shape_data, batch_size=1)
         vulns_quant = torch.zeros(shape.vulnerabilities)
-        vehicles_quant = torch.zeros(shape.vehicles)
         for i, vehicle in enumerate(self.vehicles):
-            vehicles_quant[0][i] = vehicle.as_tensor()
             for j, vuln in enumerate(vehicle.vulnerabilities):
                 vulns_quant[0][i,j] = vuln.as_tensor()
         return StateTensorBatch(
             vulnerabilities=vulns_quant,
-            vehicles=vehicles_quant,
         )
 
     @staticmethod
     def get_shape(shape_data: StateShapeData, batch_size: int) -> StateTensorBatchShape:
         return StateTensorBatchShape(
             vulnerabilities=(batch_size, shape_data.num_vehicles, shape_data.num_vulns, Vulnerability.get_shape()[0]),
-            vehicles=(batch_size, shape_data.num_vehicles, Vehicle.get_shape()[0]),
         )
 
     @staticmethod
@@ -50,7 +45,6 @@ class State:
         shape = State.get_shape(shape_data, batch_size)
         return StateTensorBatch(
             vulnerabilities=torch.zeros(shape.vulnerabilities),
-            vehicles=torch.zeros(shape.vehicles),
         )
 
         

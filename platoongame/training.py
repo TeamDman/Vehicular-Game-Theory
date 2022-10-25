@@ -202,9 +202,7 @@ class WolpertingerDefenderAgentTrainer:
         shape_data = self.config.defender_agent.state_shape_data
             
         
-        assert batch.state.vehicles.shape == (self.config.batch_size, shape_data.num_vehicles, shape_data.num_vehicle_features)
         assert batch.state.vulnerabilities.shape == (self.config.batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)
-        assert batch.state.vehicles.shape[0] == batch.state.vulnerabilities.shape[0]
 
         assert batch.action.members.shape == (self.config.batch_size, shape_data.num_vehicles)
 
@@ -216,12 +214,10 @@ class WolpertingerDefenderAgentTrainer:
             shape_data=shape_data,
             batch_size=int(terminal_indices.sum())
         ).to(get_device())
-        batch.next_state.vehicles[terminal_indices] = zero_state.vehicles
         batch.next_state.vulnerabilities[terminal_indices] = zero_state.vulnerabilities
         del zero_state
 
         assert batch.next_state.vulnerabilities.shape == batch.state.vulnerabilities.shape
-        assert batch.next_state.vehicles.shape == batch.state.vehicles.shape
 
         # get proto actions for the next states
         proto_actions:DefenderActionTensorBatch = self.config.defender_agent.actor_target(batch.next_state)
