@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass
 import random
-from typing import Generic, List, Optional, TypeVar, Union
+from typing import Generic, Iterator, List, Optional, TypeVar, Union
 from agents import DefenderAction
 from game import State
 from models import DefenderActionTensorBatch, StateShapeData, StateTensorBatch
@@ -92,6 +92,9 @@ class DequeReplayMemory(ReplayMemory, Generic[T]):
 
     def __len__(self) -> int:
         return len(self.memory)
+
+    def __iter__(self) -> Iterator[T]:
+        return iter(self.memory)
 
 # from https://github.com/ghliu/pytorch-ddpg/blob/master/memory.py#L36
 class RingReplayMemory(ReplayMemory, Generic[T]):

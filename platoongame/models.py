@@ -1,12 +1,14 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torchvision.transforms as T
+
+LazyLayer = Union[nn.LazyLinear, nn.LazyConv1d, nn.LazyConv2d, nn.LazyBatchNorm2d, nn.LazyBatchNorm1d]
 
 @dataclass(frozen=True)
 class StateShapeData:
@@ -158,12 +160,12 @@ class DefenderCritic(nn.Module):
         )
         self.vuln_norm = nn.LazyBatchNorm2d()
         
-        self.vehicle_conv = nn.LazyConv1d(
-            out_channels = 128,
-            kernel_size=2,
-            stride=1
-        )
-        self.vehicle_norm = nn.LazyBatchNorm1d()
+        # self.vehicle_conv = nn.LazyConv1d(
+        #     out_channels = 128,
+        #     kernel_size=2,
+        #     stride=1
+        # )
+        # self.vehicle_norm = nn.LazyBatchNorm1d()
 
         self.hidden1 = nn.LazyLinear(out_features = 10000)
         self.hidden2 = nn.LazyLinear(out_features = 1000)
@@ -187,8 +189,9 @@ class DefenderCritic(nn.Module):
         x_a = F.gelu(self.vuln_conv(state.vulnerabilities.permute((0,3,1,2))))
         x_a = F.gelu(self.vuln_norm(x_a))
 
-        x_b = F.gelu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
-        x_b = F.gelu(self.vehicle_norm(x_b))
+        x_b = state.vehicles
+        # x_b = F.gelu(self.vehicle_conv(state.vehicles.permute(0,2,1)))
+        # x_b = F.gelu(self.vehicle_norm(x_b))
 
         x_c = actions.members
 

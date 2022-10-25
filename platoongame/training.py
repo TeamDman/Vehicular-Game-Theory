@@ -96,6 +96,11 @@ class WolpertingerDefenderAgentTrainer:
 
     def __init__(self, config: WolpertingerDefenderAgentTrainerConfig) -> None:
         assert config.memory.get_max_len() >= config.batch_size
+        self.game = Game(config=config.game_config, vehicle_provider=config.vehicle_provider)
+        self.step = 0
+        self.optim_step = 0
+        self.episode = 0
+        self.episode_step = 0
         self.config = config
         self.random_defender_agent = RandomDefenderAgent()
 

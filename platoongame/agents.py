@@ -1,8 +1,8 @@
 from __future__ import annotations
 import logging
 import random
-from typing import Callable, Dict, Optional, Union, FrozenSet, TYPE_CHECKING
-from models import StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
+from typing import Any, Callable, Dict, List, Optional, Union, FrozenSet, TYPE_CHECKING
+from models import LazyLayer, StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
 from utils import get_logger, get_prefix
 from vehicles import CompromiseState, Vehicle
 from collections import deque
@@ -270,6 +270,7 @@ from utils import get_logger, get_device
 from models import StateShapeData, DefenderActor, DefenderCritic
 import torch
 import torch.optim
+import torch.nn
 
 #region from original deepRL author code
 
@@ -364,6 +365,14 @@ class WolpertingerDefenderAgent(DefenderAgent):
         self.epsilon = 1
         self.epsilon_decay = 1.0 / epsilon_decay_time
 
+    @property
+    def models(self) -> List[torch.nn.Module]:
+        return [self.actor, self.critic, self.actor_target, self.critic_target]
+
+    @property
+    def model_names(self) -> List[str]:
+        return ["actor", "critic", "actor_target", "critic_target"]
+
     @torch.no_grad()
     def get_action(
         self,
@@ -436,17 +445,15 @@ class WolpertingerDefenderAgent(DefenderAgent):
     def save(self, dir: str, prefix: Optional[str] = None):
         path: pathlib.Path = pathlib.Path(dir)
         path.mkdir(parents=True, exist_ok=True)
-        models = ["actor", "actor_target", "critic", "critic_target"]
         if prefix is None:
             prefix = get_prefix()
-        for model in models:
-            save_path = path / f"{prefix} {model}.pt"
-            torch.save(getattr(self,model).state_dict(), save_path)
+        for model, name in zip(self.models, self.model_names):
+            save_path = path / f"{prefix} {name}.pt"
+            torch.save(model.state_dict(), save_path)
 
     def load(self, dir: str, prefix: str):
         path = pathlib.Path(dir)
-        models = ["actor", "actor_target", "critic", "critic_target"]
-        for model in models:
-            modelpath = path / f"{prefix} {model}.pt"
-            getattr(self,model).load_state_dict(torch.load(modelpath, map_location=get_device()))
+        for model, name in zip(self.models, self.model_names):
+            modelpath = path / f"{prefix} {name}.pt"
+            model.load_state_dict(torch.load(modelpath, map_location=get_device()))
  
