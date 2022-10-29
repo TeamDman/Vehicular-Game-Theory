@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import List, Tuple, Union
+from typing import TYPE_CHECKING, List, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -10,80 +10,8 @@ import torchvision.transforms as T
 
 LazyLayer = Union[nn.LazyLinear, nn.LazyConv1d, nn.LazyConv2d, nn.LazyBatchNorm2d, nn.LazyBatchNorm1d]
 
-@dataclass(frozen=True)
-class StateShapeData:
-    num_vehicles: int           # max number of vehicles in the game
-    num_vehicle_features: int   # in platoon, risk
-    num_vulns: int              # max number of vulns in any vehicle
-    num_vuln_features: int      # prob, severity, is_compromised, is_compromise_known
-
-@dataclass(frozen=True)
-class StateTensorBatch:
-    vulnerabilities: torch.Tensor# (BatchSize, Vehicle, Vuln, VulnFeature)
-
-    def to(self, device: torch.device) -> StateTensorBatch:
-        return StateTensorBatch(
-            vulnerabilities=self.vulnerabilities.to(device),
-        )
-
-    @staticmethod
-    def cat(items: List[StateTensorBatch]) -> StateTensorBatch:
-        return StateTensorBatch(
-            vulnerabilities=torch.cat([v.vulnerabilities for v in items]),
-        )
-    
-    @staticmethod
-    def zeros(shape_data: StateShapeData, batch_size: int) -> StateTensorBatch:
-        return StateTensorBatch(
-            vulnerabilities=torch.zeros((batch_size, shape_data.num_vehicles, shape_data.num_vulns, shape_data.num_vuln_features)),
-        )
-
-    def repeat(self, times: int) -> StateTensorBatch:
-        return StateTensorBatch(
-            vulnerabilities=self.vulnerabilities.repeat((times, 1, 1, 1)),
-        )
-
-    @property
-    def batch_size(self) -> int:
-        return self.vulnerabilities.shape[0]
-
-
-@dataclass(frozen=True)
-class DefenderActionTensorBatch:
-    members: torch.Tensor # batch, 'binary' vector len=|vehicles|
-    def to(self, device: torch.device) -> DefenderActionTensorBatch:
-        return DefenderActionTensorBatch(
-            members=self.members.to(device),
-        )
-
-    @staticmethod
-    def cat(items: List[DefenderActionTensorBatch]) -> DefenderActionTensorBatch:
-        return DefenderActionTensorBatch(
-            members=torch.cat([v.members for v in items]),
-        )
-
-    def as_binary(self) -> DefenderActionTensorBatch:
-        return DefenderActionTensorBatch(
-            members=(self.members > 0.5).float(),
-        )
-
-    @property
-    def batch_size(self) -> int:
-        return self.members.shape[0]
-
-@dataclass(frozen=True)
-class AttackerActionTensorBatch:
-    attack: torch.Tensor # batch, 'binary' vector len=|vehicles|
-    def to(self, device: torch.device) -> AttackerActionTensorBatch:
-        return AttackerActionTensorBatch(
-            attack=self.attack.to(device),
-        )
-
-    @staticmethod
-    def cat(items: List[AttackerActionTensorBatch]) -> AttackerActionTensorBatch:
-        return AttackerActionTensorBatch(
-            attack=torch.cat([v.attack for v in items]),
-        )
+if TYPE_CHECKING:
+    from game import StateShapeData, StateTensorBatch, DefenderActionTensorBatch, AttackerActionTensorBatch
 
 # Generates actions
 class DefenderActor(nn.Module):

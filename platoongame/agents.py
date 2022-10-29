@@ -2,7 +2,6 @@ from __future__ import annotations
 import logging
 import random
 from typing import Any, Callable, Dict, List, Optional, Union, FrozenSet, TYPE_CHECKING
-from models import LazyLayer, StateShapeData, DefenderActionTensorBatch, AttackerActionTensorBatch, StateTensorBatch
 from utils import get_logger, get_prefix
 from vehicles import CompromiseState, Vehicle
 from collections import deque
@@ -11,36 +10,8 @@ from abc import ABC, abstractmethod
 import pathlib
 
 if TYPE_CHECKING:
-    from game import Game, State
+    from game import Game, State, StateTensorBatch,  DefenderActionTensorBatch, AttackerActionTensorBatch, StateShapeData, DefenderAction, AttackerAction, Action
 
-
-@dataclass(frozen=True)
-class DefenderAction:
-    members: FrozenSet[int] # binary vector, indices of corresponding vehicle
-
-    def as_tensor_batch(self, state_shape: StateShapeData) -> DefenderActionTensorBatch:
-        members = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
-        members[list(self.members)] = 1
-
-        return DefenderActionTensorBatch(
-            members=members.unsqueeze(dim=0),
-        )
-
-
-
-@dataclass(frozen=True)
-class AttackerAction:
-    attack: FrozenSet[int] # binary vector len=|vehicles|
-
-    def as_tensor(self, state_shape: StateShapeData):
-        attack = torch.zeros(state_shape.num_vehicles, dtype=torch.float32)
-        attack[list(self.attack)] = 1
-        return AttackerActionTensorBatch(
-            attack=attack.unsqueeze(dim=0).unsqueeze(dim=1),
-        )
-
-
-Action = Union[DefenderAction, AttackerAction]
 
 ###############################
 #region Base stuff

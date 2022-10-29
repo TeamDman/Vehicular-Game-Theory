@@ -44,8 +44,17 @@ class NoneRefersDefault:
 ##################
 # TORCH
 ##################
+import torch
+
 def get_device():
-    import torch
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-            
+# https://stackoverflow.com/a/63630138/11141271
+def dec2bin(x: torch.Tensor, bits: int):
+    # mask = 2 ** torch.arange(bits).to(x.device, x.dtype)
+    mask = 2 ** torch.arange(bits - 1, -1, -1).to(x.device, x.dtype)
+    return x.unsqueeze(-1).bitwise_and(mask).ne(0).float()
+
+def bin2dec(b: torch.Tensor, bits: int):
+    mask = 2 ** torch.arange(bits - 1, -1, -1).to(b.device, b.dtype)
+    return torch.sum(mask * b, -1)
