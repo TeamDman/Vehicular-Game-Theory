@@ -2,6 +2,10 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TeamDman/Vehicular-Game-Theory/blob/master/platoongame/training.ipynb)
 
+New notebook:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/TeamDman/Vehicular-Game-Theory/blob/master/platoongame/rage.ipynb)
+
 ## SEE ALSO
 
 https://github.com/primetang/pyflann
