@@ -1,0 +1,143 @@
+My DQN model isn't learning well. Would you be able to help if I explained it in detail?
+
+---
+
+Sure, I'd be happy to help if I can. Can you please provide more information about your DQN model and the problem you're having with it? Some details that would be helpful to know include:
+
+    What type of problem are you trying to solve? Is it a supervised learning task or a reinforcement learning task?
+    What is the input to your model, and what is the expected output?
+    How are you training your model (e.g., what algorithm are you using, and what hyperparameters are you using)?
+    What performance are you seeing, and what performance were you expecting?
+    Have you tried any troubleshooting steps or changes to your model to try to improve its performance? If so, what were they and what were the results?
+
+Providing this information can help me understand your problem and provide more specific advice.
+
+---
+
+The model is acting as a decision maker in a game centered around vehicle platooning. The game starts with 100 vehicles. Each vehicle has up to 4 vulnerabilities. Each vulnerability has a probability and a severity. Each turn the agent must pick up to 1 vehicle to leave or join the platoon. After their choice, the game simulates an attacker, who chooses one vehicle to attack. For each vulnerability in the chosen vehicle, the attacker makes a random check according to the probability of the vulnerability. If the check succeeds, the vulnerability becomes "compromised". The reward function for the agent is: the size of the platoon minus the sum of the severity of compromised vulnerabilities of vehicles within the platoon.
+
+The learning rate starts at 0.001, and gets decayed by 90% every 500 training steps.
+
+The dqn model being used is as follows:
+
+```python
+class DQN(nn.Module):
+    def __init__(self, num_vehicles: int, num_vulns: int, num_actions: int):
+        super().__init__()
+        self.main = nn.Sequential(
+            nn.Conv2d(4, 32, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(32),
+            nn.GELU(),
+            nn.Flatten(),
+            nn.Linear(32 * num_vehicles * num_vulns, 128),
+            nn.BatchNorm1d(128),
+            nn.GELU(),
+            nn.Linear(128, 128),
+            nn.BatchNorm1d(128),
+            nn.GELU(),
+        )
+        self.out = nn.Linear(128 + num_vehicles * num_vulns * 4, num_actions)
+
+
+    def forward(self, state: Tensor) -> Tensor:
+        x: Tensor = self.main(state.permute(0,3,1,2))
+        # skip connection cause why not
+        x = torch.hstack((x, state.flatten(start_dim=1)))
+        x = self.out(x)
+        return x
+```
+
+I'm not sure if conv2d layers are appropriate for this use case.
+
+The train step is as follows:
+
+```python
+# train loop
+policy_loss = torch.tensor(0)
+with tqdm() as pbar:
+    for episode in count():
+        state = env.reset()
+        for i in count():
+            # region exploration
+            epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * math.exp(-1. * ((steps_done-warmup_steps)/EPSILON_SCALE) / EPSILON_DECAY)
+            steps_done += 1
+            action = get_action(state, epsilon)
+            next_state, reward, done, info = env.step(action)
+            if done:
+                duration_history.append(i)
+                next_state = torch.zeros(state.shape)
+            else:
+                next_state = torch.as_tensor(next_state, dtype=torch.float32)                
+            memory.append(Transition(
+                state=state,
+                action=action,
+                reward=reward,
+                next_state=next_state,
+                terminal=done,
+            ))
+            state = next_state
+            #endregion exploration
+
+            if len(memory) < warmup_steps:
+                pbar.set_description(f"warmup")
+            else:
+                policy.train()
+                batch = sample_memory(BATCH_SIZE)
+
+                # calculate q values for the actions that were taken
+                q_pred = policy(batch.states).gather(1, batch.actions.unsqueeze(1))
+
+                # calculate q values for next state
+                q_next = torch.zeros(BATCH_SIZE)
+                non_final = ~batch.terminals
+                q_next[non_final] = policy_target(batch.next_states[non_final]).max(dim=1).values.detach()
+
+                # calculate expected q values
+                q_expected = ((q_next * REWARD_GAMMA) + batch.rewards).unsqueeze(1)
+
+                # calculate loss
+                policy_loss = F.smooth_l1_loss(q_pred, q_expected)
+
+                # apply weight update
+                optimizer.zero_grad()
+                policy_loss.backward()
+                for param in policy.parameters():
+                    param.grad.data.clamp_(-1, 1)
+                optimizer.step()
+                
+                # update learning rate
+                scheduler.step()
+
+                ## update target network
+                if i % POLICY_TARGET_UPDATE_INTERVAL == 0:
+                    soft_update(policy_target, policy, SOFT_UPDATE_TAU)
+                    # hard_update(policy_target, policy)
+
+                pbar.set_description(f"action: {action:02d}, policy_loss: {policy_loss.item():06.3f}, reward: {reward:+05.1f}, epsilon: {epsilon:.3f}, lr: {scheduler.get_last_lr()[0]:.4f}, steps: {steps_done}, episode: {episodes_done}.{i}")
+                
+            loss_history.append(policy_loss.item())
+            learning_rate_history.append(scheduler.get_last_lr()[0])
+            action_history.append(action)
+            reward_history.append(reward)
+            terminal_history.append(done)
+            platoon_size_history.append(int(next_state[:,:,0].sum(dim=1).count_nonzero().item()))
+            platoon_compromise_impact_history.append(int((next_state[:,:,0] * next_state[:,:,2] * next_state[:,:,3]).sum().item()))
+            platoon_compromise_count_history.append(int((next_state[:,:,0] * next_state[:,:,3]).sum(dim=1).count_nonzero().item()))
+
+            if done: break
+            pbar.update()
+        episodes_done += 1
+env.close()
+```
+
+---
+
+It looks like your model is using a deep Q-network (DQN) to solve a reinforcement learning problem. In this case, the input to your model is the state of the game, and the expected output is the action to take (i.e., the decision to leave or join the platoon with a particular vehicle).
+
+One possible issue with your model is that you're using a convolutional neural network (CNN) with nn.Conv2d layers. These layers are typically used for image processing tasks, where the input is an image and the output is some kind of prediction or classification. In your case, however, the input is a matrix of numbers representing the state of the game, so using convolutional layers might not be the best approach.
+
+One way to improve your model's performance could be to use a different type of neural network architecture that is better suited to the type of input data you have. For example, you could use a fully-connected neural network with nn.Linear layers. This would allow your model to learn more complex relationships between the inputs and the outputs, and may help it learn to make better decisions.
+
+Another possible issue with your model is the use of the GELU activation function. GELU is a relatively new activation function that has been shown to perform well in some contexts, but it may not be the best choice for your problem. You could try using a different activation function, such as ReLU or sigmoid, and see if that improves your model's performance.
+
+In general, there are many factors that can affect the performance of a DQN model, and it can be difficult to diagnose and fix specific problems without more information about your training process and the results you're seeing. If you're still having trouble getting your model to learn effectively, I would recommend reaching out to a machine learning expert or community for more specific advice and support.
