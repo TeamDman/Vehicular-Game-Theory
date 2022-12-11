@@ -1,21 +1,45 @@
+import gym
+import gym.spaces
+import gym.logger
+import gym.error
+import torch
+from torch import Tensor
+from typing import Optional, Tuple
+from dataclasses import dataclass
+import numpy as np
+
+# https://github.com/0xangelo/gym-cartpole-swingup/blob/master/gym_cartpole_swingup/__init__.py
+from gym.envs.registration import register
+
+register(
+    id="TorchPlatoon-v0",
+    entry_point="platoonenv:PlatoonEnv",
+    # max_episode_steps=20,
+)
+
+@dataclass
+class PlatoonEnvParams:
+    num_vehicles: int = 10
+    num_vulns: int = 3
+    num_attack: int = 1
+    attack_interval: int = 2
+
+class MyBox(gym.spaces.Box):
+    def __init__(self, low, high):
+        super().__init__(low, high)
+
+    def sample(self):
+        x = super().sample()
+        x[:,:,0] = x[:,:,0] > 0.5
+        x[:,:,3] = x[:,:,3] > 0.5
+        x[:,:,2] = x[:,:,2].round()
+        return x
 class PlatoonEnv(gym.Env):
-    metadata = {"render.modes": ["human"]}
-    def __init__(
-        self,
-        num_vehicles: int,
-        num_vulns: int,
-        num_attack: int,
-        num_steps: int,
-        attack_interval: int,
-        render_mode: str,
-    ):
-        self.num_vehicles = num_vehicles
-        self.num_vulns = num_vulns
-        self.num_attack = num_attack
-        self.num_steps = num_steps
-        self.attack_interval = attack_interval
-        self.reward_range = (0, num_vehicles)
-        self.render_mode = render_mode
+    metadata = {"render_modes": ["human"], "render_fps": 30}
+    def __init__(self, render_mode: Optional[str] = None, params: Optional[PlatoonEnvParams] = None):
+        gym.logger.warn("pls ignore gym complaints about observation space")
+        self.params = params or PlatoonEnvParams()
+        self.reward_range = (0, self.params.num_vehicles)
         self.screen_width = 600
         self.screen_height = 400
         self.screen = None
@@ -23,12 +47,13 @@ class PlatoonEnv(gym.Env):
         self.clock = None
         self.isopen = True
         self.latest_reward = None
+        self.render_mode = render_mode
         self.episode_reward_total = 0
-        self.action_space = gym.spaces.Discrete(num_vehicles + 1) # include no-op
+        self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
         self.observation_space = MyBox(
             # member, prob, sev, compromised
-            low=torch.tensor((0,0.0,1,0)).repeat(3,1).repeat(5,1,1).numpy(),
-            high=torch.tensor((1,1.0,5,1)).repeat(3,1).repeat(5,1,1).numpy(),
+            low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+            high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
         )
         self.prob_dist = torch.distributions.Normal(
             # loc=torch.as_tensor(0.5),
@@ -43,17 +68,17 @@ class PlatoonEnv(gym.Env):
 
         self.reset()
 
-    def step(self, action: int) -> Tuple[Tensor, float, bool, dict]:
-        if action != self.num_vehicles: # it not no-op
+    def step(self, action: int) -> Tuple[Tensor, float, bool, bool, dict]:
+        if action != self.params.num_vehicles: # it not no-op
             # toggle membership for the chosen vehicle
             self.state[action,:,0] = 1-self.state[action,:,0]
 
-        if self.current_step % self.attack_interval == 0:
+        if self.current_step % self.params.attack_interval == 0:
             # prio calculated as sum of the prio of the vulns within the vehicle
             # prio = prob * severity * not_compromised + 100*is_member
             priority = (self.state[:,:,1] * self.state[:,:,2] * (1-self.state[:,:,3]) + (100*self.state[:,:,0])).sum(dim=-1)
             # identify vehicles to attack
-            mask = priority.topk(self.num_attack).indices
+            mask = priority.topk(self.params.num_attack).indices
             attack = self.state[mask]
             # attack proc
             roll = torch.rand(attack.shape[:-1])
@@ -73,24 +98,28 @@ class PlatoonEnv(gym.Env):
         reward = reward.item()
 
         self.current_step += 1
-        done = self.current_step >= self.num_steps
+        # done = self.current_step >= self.num_steps
+        done = False
         self.latest_reward = reward
         self.episode_reward_total += reward
 
-        return self.state, reward, done, {}
+        return self.state.numpy(), reward, done, False, {}
 
-    def reset(self):
+    def reset(self, *, seed:Optional[int] = None, options: Optional[dict] = {}):
+        if seed is not None:
+            np.random.seed(seed)
+            torch.manual_seed(seed)
         self.current_step = 0
-        self.state = torch.zeros((self.num_vehicles, self.num_vulns, 4))
-        self.state[:,:,1] = self.prob_dist.sample(torch.Size((self.num_vehicles, self.num_vulns))).clamp(0,1)
-        self.state[:,:,2] = self.sev_dist.sample(torch.Size((self.num_vehicles, self.num_vulns))).round().clamp(1,5)
-        novulns = torch.rand(torch.Size((self.num_vehicles, self.num_vulns))) > 0.5
+        self.state = torch.zeros((self.params.num_vehicles, self.params.num_vulns, 4))
+        self.state[:,:,1] = self.prob_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).clamp(0,1)
+        self.state[:,:,2] = self.sev_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).round().clamp(1,5)
+        novulns = torch.rand(torch.Size((self.params.num_vehicles, self.params.num_vulns))) > 0.5
         self.state[novulns, :] = 0
         self.latest_reward = None
         self.episode_reward_total = 0
-        return self.state
+        return self.state.numpy(), {}
     
-    def render(self, mode="human", close=False):
+    def render(self):
         if self.render_mode is None:
             gym.logger.warn(
                 "You are calling render method without specifying any render mode. "
@@ -134,7 +163,7 @@ class PlatoonEnv(gym.Env):
         padding = 4
         vehicles_per_row = int(self.screen_width // (vehicle_size+padding*2))
         vehicles_per_column = int(self.screen_height // (vehicle_size+padding*2))
-        for i in range(self.num_vehicles):
+        for i in range(self.params.num_vehicles):
             color = (0,100,255)
             solid = False
             if x[i,0,0] == 1: # in platoon
@@ -161,7 +190,14 @@ class PlatoonEnv(gym.Env):
         self.surf = pygame.transform.flip(self.surf, False, True)
         self.screen.blit(self.surf, (0, 0))
         if self.font is not None:
-            self.screen.blit(self.font.render(f"reward: {self.latest_reward:+0.1f} ({self.episode_reward_total})", True, (0,0,0)), (0,0))
+            self.screen.blit(
+                source=self.font.render(
+                    f"reward: {self.latest_reward or 0:+0.1f} ({self.episode_reward_total})",
+                    True,
+                    (0,0,0)
+                ),
+                dest=(0,0)
+            )
 
         if self.render_mode == "human":
             pygame.event.pump()
