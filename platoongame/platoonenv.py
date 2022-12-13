@@ -4,7 +4,7 @@ import gym.logger
 import gym.error
 import torch
 from torch import Tensor
-from typing import Optional, Tuple
+from typing import Literal, Optional, Tuple, Union
 from dataclasses import dataclass
 import numpy as np
 
@@ -12,7 +12,7 @@ import numpy as np
 from gym.envs.registration import register
 
 register(
-    id="TorchPlatoon-v0",
+    id="Platoon-v0",
     entry_point="platoonenv:PlatoonEnv",
     # max_episode_steps=20,
 )
@@ -37,7 +37,7 @@ class MyBox(gym.spaces.Box):
 class PlatoonEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 30}
     def __init__(self, render_mode: Optional[str] = None, params: Optional[PlatoonEnvParams] = None):
-        gym.logger.warn("pls ignore gym complaints about observation space")
+        # gym.logger.warn("pls ignore gym complaints about observation space")
         self.params = params or PlatoonEnvParams()
         self.reward_range = (0, self.params.num_vehicles)
         self.screen_width = 600
@@ -50,11 +50,22 @@ class PlatoonEnv(gym.Env):
         self.render_mode = render_mode
         self.episode_reward_total = 0
         self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
-        self.observation_space = MyBox(
-            # member, prob, sev, compromised
-            low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-            high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+        # member/not only
+        self.observation_space = gym.spaces.Box(
+            low=np.zeros(self.params.num_vehicles, dtype=np.float32),
+            high=np.ones(self.params.num_vehicles, dtype=np.float32),
         )
+        # less accurate
+        # self.observation_space = gym.spaces.Box(
+        #     low=np.zeros(self.params.num_vehicles * self.params.num_vulns * 4),
+        #     high=np.ones(self.params.num_vehicles * self.params.num_vulns * 4) * 5,
+        # )
+        # very accurate
+        # self.observation_space = MyBox(
+        #     # member, prob, sev, compromised
+        #     low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+        #     high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+        # )
         self.prob_dist = torch.distributions.Normal(
             # loc=torch.as_tensor(0.5),
             loc=torch.as_tensor(0.1),
@@ -68,12 +79,20 @@ class PlatoonEnv(gym.Env):
 
         self.reset()
 
+    def seed(self, seed):
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+
+    def get_observation(self):
+        return (self.state[:,:,0].sum(dim=1) > 0).float().numpy()
+        # return self.state.flatten().numpy()
+
     def step(self, action: int) -> Tuple[Tensor, float, bool, bool, dict]:
         if action != self.params.num_vehicles: # it not no-op
             # toggle membership for the chosen vehicle
             self.state[action,:,0] = 1-self.state[action,:,0]
 
-        if self.current_step % self.params.attack_interval == 0:
+        if self.current_step % self.params.attack_interval == 0 and self.current_step > 0:
             # prio calculated as sum of the prio of the vulns within the vehicle
             # prio = prob * severity * not_compromised + 100*is_member
             priority = (self.state[:,:,1] * self.state[:,:,2] * (1-self.state[:,:,3]) + (100*self.state[:,:,0])).sum(dim=-1)
@@ -90,25 +109,27 @@ class PlatoonEnv(gym.Env):
             attack[success_mask] = success
             self.state[mask] = attack
 
-        # reward starts as the size of the platoon
-        reward = self.state[:,:,0].sum(dim=1).count_nonzero()
-        # subtract the severity of any compromised vulns within the platoon
-        # is_compromised * severity * is_member
-        reward -= (self.state[:,:,3] * self.state[:,:,2] * self.state[:,:,0]).sum().int()
-        reward = reward.item()
+        # reward starts at zero
+        reward = torch.tensor(0, dtype=torch.int32)
+        # lose points for each vehicle outside the platoon
+        reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
+        # lose points for each compromise inside the platoon based on sqrt(severity)
+        reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
 
+        reward = reward.item()
         self.current_step += 1
         # done = self.current_step >= self.num_steps
         done = False
         self.latest_reward = reward
         self.episode_reward_total += reward
 
-        return self.state.numpy(), reward, done, False, {}
+        return self.get_observation(), reward, done, False, {}
 
     def reset(self, *, seed:Optional[int] = None, options: Optional[dict] = {}):
-        if seed is not None:
-            np.random.seed(seed)
-            torch.manual_seed(seed)
+        super().reset(seed=seed)
+        # if seed is not None:
+        #     np.random.seed(seed)
+        #     torch.manual_seed(seed)
         self.current_step = 0
         self.state = torch.zeros((self.params.num_vehicles, self.params.num_vulns, 4))
         self.state[:,:,1] = self.prob_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).clamp(0,1)
@@ -117,7 +138,7 @@ class PlatoonEnv(gym.Env):
         self.state[novulns, :] = 0
         self.latest_reward = None
         self.episode_reward_total = 0
-        return self.state.numpy(), {}
+        return self.get_observation(), {}
     
     def render(self):
         if self.render_mode is None:
@@ -142,7 +163,8 @@ class PlatoonEnv(gym.Env):
             if self.render_mode == "human":
                 pygame.display.init()
                 self.screen = pygame.display.set_mode(
-                    (self.screen_width, self.screen_height)
+                    (self.screen_width, self.screen_height),
+                    display=1
                 )
                 self.font = pygame.font.SysFont("Comic Sans MS", 30)
             else:  # mode == "rgb_array"
@@ -217,3 +239,4 @@ class PlatoonEnv(gym.Env):
             pygame.display.quit()
             pygame.quit()
             self.isopen=False
+            self.screen = None

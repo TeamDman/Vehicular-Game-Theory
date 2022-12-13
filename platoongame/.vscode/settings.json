@@ -1,6 +1,8 @@
 {
     "python.analysis.typeCheckingMode": "basic",
     "cSpell.words": [
+        "dtype",
+        "tensorboard",
         "tianshou",
         "yeet"
     ]
