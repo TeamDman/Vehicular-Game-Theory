@@ -2,8 +2,16 @@
     "python.analysis.typeCheckingMode": "basic",
     "cSpell.words": [
         "dtype",
+        "ipympl",
+        "matplotlib",
+        "ncols",
+        "pbar",
+        "platoonenv",
+        "suptitle",
         "tensorboard",
         "tianshou",
+        "tqdm",
+        "vulns",
         "yeet"
     ]
 }

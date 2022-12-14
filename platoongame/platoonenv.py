@@ -15,6 +15,7 @@ register(
     id="Platoon-v0",
     entry_point="platoonenv:PlatoonEnv",
     # max_episode_steps=20,
+    reward_threshold=-45
 )
 
 @dataclass
@@ -34,7 +35,7 @@ class MyBox(gym.spaces.Box):
         x[:,:,3] = x[:,:,3] > 0.5
         x[:,:,2] = x[:,:,2].round()
         return x
-class PlatoonEnv(gym.Env):
+class PlatoonEnv(gym.Env[np.ndarray, int]):
     metadata = {"render_modes": ["human"], "render_fps": 30}
     def __init__(self, render_mode: Optional[str] = None, params: Optional[PlatoonEnvParams] = None):
         # gym.logger.warn("pls ignore gym complaints about observation space")
