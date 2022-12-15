@@ -111,6 +111,9 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
 
     def reset(self, *, seed:Optional[int] = None, options: Optional[dict] = {}):
         super().reset(seed=seed)
+        if seed is not None:
+            np.random.seed(seed)
+            torch.manual_seed(seed)
         self.current_step = 0
         self.state = torch.zeros((self.params.num_vehicles, self.params.num_vulns, 4))
         self.state[:,:,1] = self.prob_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).clamp(0,1)
