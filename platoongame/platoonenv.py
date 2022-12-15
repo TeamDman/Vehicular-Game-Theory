@@ -41,23 +41,7 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
         self.latest_reward = None
         self.render_mode = render_mode
         self.episode_reward_total = 0
-        self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
-        # member/not only
-        self.observation_space = gym.spaces.Box(
-            low=np.zeros(self.params.num_vehicles, dtype=np.float32),
-            high=np.ones(self.params.num_vehicles, dtype=np.float32),
-        )
-        # less accurate
-        # self.observation_space = gym.spaces.Box(
-        #     low=np.zeros(self.params.num_vehicles * self.params.num_vulns * 4),
-        #     high=np.ones(self.params.num_vehicles * self.params.num_vulns * 4) * 5,
-        # )
-        # very accurate
-        # self.observation_space = MyBox(
-        #     # member, prob, sev, compromised
-        #     low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-        #     high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-        # )
+
         self.prob_dist = torch.distributions.Normal(
             # loc=torch.as_tensor(0.5),
             loc=torch.as_tensor(0.1),
@@ -84,10 +68,10 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
     def get_reward(self) -> float:
         return 0
 
-    def get_observation(self) -> Tensor:
-        return torch.Tensor()
+    def get_observation(self) -> np.ndarray:
+        return torch.Tensor().numpy()
 
-    def step(self, action: int) -> Tuple[Tensor, float, bool, bool, dict]:
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, dict]:
         if action != self.params.num_vehicles: # it not no-op
             # toggle membership for the chosen vehicle
             self.state[action,:,0] = 1-self.state[action,:,0]
@@ -251,12 +235,17 @@ class PlatoonEnvV0(PlatoonEnv):
             render_mode = render_mode,
         )
 
-    def get_observation(self):
-        return (self.state[:,:,0].sum(dim=1) > 0).float().numpy()
-        # return self.state.flatten().numpy()
+        self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
+        # member/not only
+        self.observation_space = gym.spaces.Box(
+            low=np.zeros(self.params.num_vehicles, dtype=np.float32),
+            high=np.ones(self.params.num_vehicles, dtype=np.float32),
+        )
 
-    def get_done(self) -> bool:        
-        # done = self.current_step >= self.num_steps
+    def get_observation(self) -> np.ndarray:
+        return (self.state[:,:,0].sum(dim=1) > 0).float().numpy()
+
+    def get_done(self) -> bool:
         return False
 
     def get_truncated(self) -> bool:
@@ -267,22 +256,53 @@ class PlatoonEnvV0(PlatoonEnv):
         reward = torch.tensor(0, dtype=torch.int32)
         # lose points for each vehicle outside the platoon
         reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
+        return reward.item()
+
+class PlatoonEnvV1(PlatoonEnv):
+    def __init__(self, render_mode: Optional[str] = None):
+        super().__init__(
+            params=PlatoonEnvParams(
+                num_vehicles = 10,
+                num_vulns = 3,
+                num_attack = 1,
+                attack_interval = 2,
+            ),
+            render_mode = render_mode,
+        )
+
+        self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
+        # # member/not only
+        # self.observation_space = gym.spaces.Box(
+        #     low=np.zeros(self.params.num_vehicles, dtype=np.float32),
+        #     high=np.ones(self.params.num_vehicles, dtype=np.float32),
+        # )
+        self.observation_space = MyBox(
+            # member, prob, sev, compromised
+            low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+            high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+        )
+
+    
+    def get_observation(self) -> np.ndarray:
+        return self.state.numpy()
+        # return self.state.flatten().numpy()
+
+    def get_done(self) -> bool:        
+        # done = self.current_step >= self.num_steps
+        return False
+
+    def get_truncated(self) -> bool:
+        return self.current_step >= 25
+
+    def get_reward(self) -> float:
+        # reward starts at zero
+        reward = torch.tensor(0, dtype=torch.int32)
+        # lose points for each vehicle outside the platoon
+        reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
         # lose points for each compromise inside the platoon based on sqrt(severity)
         reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
 
         return reward.item()
-
-# class PlatoonEnvV1(PlatoonEnv):
-#     def __init__(self, render_mode: Optional[str] = None):
-#         super().__init__(
-#             params=PlatoonEnvParams(
-#                 num_vehicles = 100,
-#                 num_vulns = 3,
-#                 num_attack = 1,
-#                 attack_interval = 2,
-#             ),
-#             render_mode = render_mode,
-#         )
 
 
 # https://github.com/0xangelo/gym-cartpole-swingup/blob/master/gym_cartpole_swingup/__init__.py
@@ -295,9 +315,9 @@ register(
     reward_threshold=-45
 )
 
-# register(
-#     id="Platoon-v1",
-#     entry_point="platoonenv:PlatoonEnvV1",
-#     # max_episode_steps=20,
-#     reward_threshold=-45
-# )
+register(
+    id="Platoon-v1",
+    entry_point="platoonenv:PlatoonEnvV1",
+    # max_episode_steps=20,
+    reward_threshold=-45
+)

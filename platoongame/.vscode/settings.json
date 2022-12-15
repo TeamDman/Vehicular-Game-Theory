@@ -2,6 +2,7 @@
     "python.analysis.typeCheckingMode": "basic",
     "cSpell.words": [
         "aacircle",
+        "Acrobot",
         "dtype",
         "gfxdraw",
         "ipympl",
