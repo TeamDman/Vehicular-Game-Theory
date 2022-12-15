@@ -8,22 +8,12 @@ from typing import Literal, Optional, Tuple, Union
 from dataclasses import dataclass
 import numpy as np
 
-# https://github.com/0xangelo/gym-cartpole-swingup/blob/master/gym_cartpole_swingup/__init__.py
-from gym.envs.registration import register
-
-register(
-    id="Platoon-v0",
-    entry_point="platoonenv:PlatoonEnv",
-    # max_episode_steps=20,
-    reward_threshold=-45
-)
-
 @dataclass
 class PlatoonEnvParams:
-    num_vehicles: int = 10
-    num_vulns: int = 3
-    num_attack: int = 1
-    attack_interval: int = 2
+    num_vehicles: int
+    num_vulns: int
+    num_attack: int
+    attack_interval: int
 
 class MyBox(gym.spaces.Box):
     def __init__(self, low, high):
@@ -37,9 +27,10 @@ class MyBox(gym.spaces.Box):
         return x
 class PlatoonEnv(gym.Env[np.ndarray, int]):
     metadata = {"render_modes": ["human"], "render_fps": 30}
-    def __init__(self, render_mode: Optional[str] = None, params: Optional[PlatoonEnvParams] = None):
+    def __init__(self, params: PlatoonEnvParams, render_mode: Optional[str] = None):
         # gym.logger.warn("pls ignore gym complaints about observation space")
-        self.params = params or PlatoonEnvParams()
+        assert params.num_vulns > 0, "need at least 1 vuln"
+        self.params = params
         self.reward_range = (0, self.params.num_vehicles)
         self.screen_width = 600
         self.screen_height = 400
@@ -84,18 +75,29 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
         torch.manual_seed(seed)
         np.random.seed(seed)
 
-    def get_observation(self):
-        return (self.state[:,:,0].sum(dim=1) > 0).float().numpy()
-        # return self.state.flatten().numpy()
+    def get_done(self) -> bool:        
+        return False
+
+    def get_truncated(self) -> bool:
+        return False
+
+    def get_reward(self) -> float:
+        return 0
+
+    def get_observation(self) -> Tensor:
+        return torch.Tensor()
 
     def step(self, action: int) -> Tuple[Tensor, float, bool, bool, dict]:
         if action != self.params.num_vehicles: # it not no-op
             # toggle membership for the chosen vehicle
             self.state[action,:,0] = 1-self.state[action,:,0]
 
-        if self.current_step % self.params.attack_interval == 0 and self.current_step > 0:
-            # prio calculated as sum of the prio of the vulns within the vehicle
-            # prio = prob * severity * not_compromised + 100*is_member
+        if self.params.attack_interval > 0 \
+        and self.params.num_attack > 0 \
+        and self.current_step % self.params.attack_interval == 0 \
+        and self.current_step > 0:
+            # priority calculated as sum of the priority of the vulns within the vehicle
+            # priority = prob * severity * not_compromised + 100*is_member
             priority = (self.state[:,:,1] * self.state[:,:,2] * (1-self.state[:,:,3]) + (100*self.state[:,:,0])).sum(dim=-1)
             # identify vehicles to attack
             mask = priority.topk(self.params.num_attack).indices
@@ -110,27 +112,21 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
             attack[success_mask] = success
             self.state[mask] = attack
 
-        # reward starts at zero
-        reward = torch.tensor(0, dtype=torch.int32)
-        # lose points for each vehicle outside the platoon
-        reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
-        # lose points for each compromise inside the platoon based on sqrt(severity)
-        reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
+        obs = self.get_observation()
+        reward = self.get_reward()
+        done = self.get_done()
+        trunc = self.get_truncated()
+        info = {}
 
-        reward = reward.item()
+
         self.current_step += 1
-        # done = self.current_step >= self.num_steps
-        done = False
         self.latest_reward = reward
         self.episode_reward_total += reward
 
-        return self.get_observation(), reward, done, False, {}
+        return obs, reward, done, trunc, info
 
     def reset(self, *, seed:Optional[int] = None, options: Optional[dict] = {}):
         super().reset(seed=seed)
-        # if seed is not None:
-        #     np.random.seed(seed)
-        #     torch.manual_seed(seed)
         self.current_step = 0
         self.state = torch.zeros((self.params.num_vehicles, self.params.num_vulns, 4))
         self.state[:,:,1] = self.prob_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).clamp(0,1)
@@ -239,5 +235,69 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
             import pygame
             pygame.display.quit()
             pygame.quit()
-            self.isopen=False
+            self.isopen = False
             self.screen = None
+
+class PlatoonEnvV0(PlatoonEnv):
+    def __init__(self, render_mode: Optional[str] = None):
+        super().__init__(
+            # no attacks in v0
+            params=PlatoonEnvParams(
+                num_vehicles=10,
+                num_vulns=1,
+                num_attack=0,
+                attack_interval=0
+            ),
+            render_mode = render_mode,
+        )
+
+    def get_observation(self):
+        return (self.state[:,:,0].sum(dim=1) > 0).float().numpy()
+        # return self.state.flatten().numpy()
+
+    def get_done(self) -> bool:        
+        # done = self.current_step >= self.num_steps
+        return False
+
+    def get_truncated(self) -> bool:
+        return self.current_step >= self.params.num_vehicles
+
+    def get_reward(self) -> float:
+        # reward starts at zero
+        reward = torch.tensor(0, dtype=torch.int32)
+        # lose points for each vehicle outside the platoon
+        reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
+        # lose points for each compromise inside the platoon based on sqrt(severity)
+        reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
+
+        return reward.item()
+
+# class PlatoonEnvV1(PlatoonEnv):
+#     def __init__(self, render_mode: Optional[str] = None):
+#         super().__init__(
+#             params=PlatoonEnvParams(
+#                 num_vehicles = 100,
+#                 num_vulns = 3,
+#                 num_attack = 1,
+#                 attack_interval = 2,
+#             ),
+#             render_mode = render_mode,
+#         )
+
+
+# https://github.com/0xangelo/gym-cartpole-swingup/blob/master/gym_cartpole_swingup/__init__.py
+from gym.envs.registration import register
+
+register(
+    id="Platoon-v0",
+    entry_point="platoonenv:PlatoonEnvV0",
+    # max_episode_steps=20,
+    reward_threshold=-45
+)
+
+# register(
+#     id="Platoon-v1",
+#     entry_point="platoonenv:PlatoonEnvV1",
+#     # max_episode_steps=20,
+#     reward_threshold=-45
+# )

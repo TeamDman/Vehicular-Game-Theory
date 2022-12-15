@@ -1,15 +1,21 @@
 {
     "python.analysis.typeCheckingMode": "basic",
     "cSpell.words": [
+        "aacircle",
         "dtype",
+        "gfxdraw",
         "ipympl",
+        "isopen",
         "matplotlib",
         "ncols",
+        "novulns",
         "pbar",
         "platoonenv",
         "suptitle",
+        "surfarray",
         "tensorboard",
         "tianshou",
+        "topk",
         "tqdm",
         "vulns",
         "yeet"
