@@ -322,5 +322,5 @@ register(
     id="Platoon-v1",
     entry_point="platoonenv:PlatoonEnvV1",
     # max_episode_steps=20,
-    reward_threshold=-45
+    reward_threshold=-45 # -157 is best I've seen so far after 4 hours of training and 1.3M steps
 )
