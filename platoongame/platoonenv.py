@@ -14,6 +14,8 @@ class PlatoonEnvParams:
     num_vulns: int
     num_attack: int
     attack_interval: int
+    prob_dist: torch.distributions.Distribution
+    sev_dist: torch.distributions.Distribution
 
 class MyBox(gym.spaces.Box):
     def __init__(self, low, high):
@@ -42,15 +44,6 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
         self.render_mode = render_mode
         self.episode_reward_total = 0
 
-        self.prob_dist = torch.distributions.Normal(
-            # loc=torch.as_tensor(0.5),
-            loc=torch.as_tensor(0.1),
-            scale=torch.as_tensor(0.25),
-        )
-        self.sev_dist = torch.distributions.Normal(
-            loc=torch.as_tensor(2.0),
-            scale=torch.as_tensor(1.0),
-        )
 
 
         self.reset()
@@ -116,8 +109,8 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
             torch.manual_seed(seed)
         self.current_step = 0
         self.state = torch.zeros((self.params.num_vehicles, self.params.num_vulns, 4))
-        self.state[:,:,1] = self.prob_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).clamp(0,1)
-        self.state[:,:,2] = self.sev_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).round().clamp(1,5)
+        self.state[:,:,1] = self.params.prob_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).clamp(0,1)
+        self.state[:,:,2] = self.params.sev_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).round().clamp(1,5)
         novulns = torch.rand(torch.Size((self.params.num_vehicles, self.params.num_vulns))) > 0.5
         self.state[novulns, :] = 0
         self.latest_reward = None
@@ -148,7 +141,7 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
                 pygame.display.init()
                 self.screen = pygame.display.set_mode(
                     (self.screen_width, self.screen_height),
-                    display=1
+                    display=1 # start on my side monitor so I don't have to move it every time :P
                 )
                 self.font = pygame.font.SysFont("Comic Sans MS", 30)
             else:  # mode == "rgb_array"
@@ -233,7 +226,15 @@ class PlatoonEnvV0(PlatoonEnv):
                 num_vehicles=10,
                 num_vulns=1,
                 num_attack=0,
-                attack_interval=0
+                attack_interval=0,
+                prob_dist = torch.distributions.Normal(
+                    loc=torch.as_tensor(0),
+                    scale=torch.as_tensor(0.1),
+                ),
+                sev_dist = torch.distributions.Normal(
+                    loc=torch.as_tensor(0),
+                    scale=torch.as_tensor(0.1),
+                )
             ),
             render_mode = render_mode,
         )
@@ -267,8 +268,70 @@ class PlatoonEnvV1(PlatoonEnv):
             params=PlatoonEnvParams(
                 num_vehicles = 10,
                 num_vulns = 3,
+                num_attack = 0,
+                attack_interval = 0,
+                prob_dist = torch.distributions.Normal(
+                    loc=torch.as_tensor(0.0),
+                    scale=torch.as_tensor(0.1),
+                ),
+                sev_dist = torch.distributions.Normal(
+                    loc=torch.as_tensor(0.0),
+                    scale=torch.as_tensor(0.1),
+                )
+            ),
+            render_mode = render_mode,
+        )
+
+        self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
+        # # member/not only
+        # self.observation_space = gym.spaces.Box(
+        #     low=np.zeros(self.params.num_vehicles, dtype=np.float32),
+        #     high=np.ones(self.params.num_vehicles, dtype=np.float32),
+        # )
+        self.observation_space = MyBox(
+            # member, prob, sev, compromised
+            low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+            high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+        )
+
+    
+    def get_observation(self) -> np.ndarray:
+        return self.state.numpy()
+        # return self.state.flatten().numpy()
+
+    def get_done(self) -> bool:        
+        # done = self.current_step >= self.num_steps
+        return False
+
+    def get_truncated(self) -> bool:
+        return self.current_step >= 25
+
+    def get_reward(self) -> float:
+        # reward starts at zero
+        reward = torch.tensor(0, dtype=torch.int32)
+        # lose points for each vehicle outside the platoon
+        reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
+        # lose points for each compromise inside the platoon based on sqrt(severity)
+        reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
+
+        return reward.item()
+
+class PlatoonEnvV2(PlatoonEnv):
+    def __init__(self, render_mode: Optional[str] = None):
+        super().__init__(
+            params=PlatoonEnvParams(
+                num_vehicles = 10,
+                num_vulns = 3,
                 num_attack = 1,
                 attack_interval = 2,
+                prob_dist = torch.distributions.Normal(
+                    loc=torch.as_tensor(0.05),
+                    scale=torch.as_tensor(0.1),
+                ),
+                sev_dist = torch.distributions.Normal(
+                    loc=torch.as_tensor(1.0),
+                    scale=torch.as_tensor(1.0),
+                )
             ),
             render_mode = render_mode,
         )
@@ -324,3 +387,12 @@ register(
     # max_episode_steps=20,
     reward_threshold=-45 # -157 is best I've seen so far after 4 hours of training and 1.3M steps
 )
+
+register(
+    id="Platoon-v2",
+    entry_point="platoonenv:PlatoonEnvV2",
+    # max_episode_steps=20,
+    reward_threshold=-45
+)
+
+# todo: if a vuln attack fails, it should be considered failed forever (set probability to 0)
