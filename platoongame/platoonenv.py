@@ -30,7 +30,6 @@ class MyBox(gym.spaces.Box):
 class PlatoonEnv(gym.Env[np.ndarray, int]):
     metadata = {"render_modes": ["human"], "render_fps": 30}
     def __init__(self, params: PlatoonEnvParams, render_mode: Optional[str] = None):
-        # gym.logger.warn("pls ignore gym complaints about observation space")
         assert params.num_vulns > 0, "need at least 1 vuln"
         self.params = params
         self.reward_range = (0, self.params.num_vehicles)
@@ -43,9 +42,6 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
         self.latest_reward = None
         self.render_mode = render_mode
         self.episode_reward_total = 0
-
-
-
         self.reset()
 
     def seed(self, seed):
@@ -111,8 +107,8 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
         self.state = torch.zeros((self.params.num_vehicles, self.params.num_vulns, 4))
         self.state[:,:,1] = self.params.prob_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).clamp(0,1)
         self.state[:,:,2] = self.params.sev_dist.sample(torch.Size((self.params.num_vehicles, self.params.num_vulns))).round().clamp(1,5)
-        novulns = torch.rand(torch.Size((self.params.num_vehicles, self.params.num_vulns))) > 0.5
-        self.state[novulns, :] = 0
+        # novulns = torch.rand(torch.Size((self.params.num_vehicles, self.params.num_vulns))) > 0.5
+        # self.state[novulns, :] = 0
         self.latest_reward = None
         self.episode_reward_total = 0
         return self.get_observation(), {}
@@ -228,11 +224,11 @@ class PlatoonEnvV0(PlatoonEnv):
                 num_attack=0,
                 attack_interval=0,
                 prob_dist = torch.distributions.Normal(
-                    loc=torch.as_tensor(0),
+                    loc=torch.as_tensor(0.0),
                     scale=torch.as_tensor(0.1),
                 ),
                 sev_dist = torch.distributions.Normal(
-                    loc=torch.as_tensor(0),
+                    loc=torch.as_tensor(0.0),
                     scale=torch.as_tensor(0.1),
                 )
             ),
@@ -267,7 +263,7 @@ class PlatoonEnvV1(PlatoonEnv):
         super().__init__(
             params=PlatoonEnvParams(
                 num_vehicles = 10,
-                num_vulns = 3,
+                num_vulns = 1,
                 num_attack = 0,
                 attack_interval = 0,
                 prob_dist = torch.distributions.Normal(
@@ -304,7 +300,7 @@ class PlatoonEnvV1(PlatoonEnv):
         return False
 
     def get_truncated(self) -> bool:
-        return self.current_step >= 25
+        return self.current_step >= self.params.num_vehicles
 
     def get_reward(self) -> float:
         # reward starts at zero
