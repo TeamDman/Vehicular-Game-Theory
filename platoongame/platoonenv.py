@@ -1,12 +1,11 @@
-import gym
-import gym.spaces
-import gym.logger
-import gym.error
+import gymnasium as gym
+from gymnasium import spaces
 import torch
 from torch import Tensor
 from typing import Literal, Optional, Tuple, Union
 from dataclasses import dataclass
 import numpy as np
+import random
 
 @dataclass
 class PlatoonEnvParams:
@@ -17,7 +16,7 @@ class PlatoonEnvParams:
     prob_dist: torch.distributions.Distribution
     sev_dist: torch.distributions.Distribution
 
-class MyBox(gym.spaces.Box):
+class MyBox(spaces.Box):
     def __init__(self, low, high):
         super().__init__(low, high)
 
@@ -214,181 +213,170 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
             self.isopen = False
             self.screen = None
 
-class PlatoonEnvV0(PlatoonEnv):
-    def __init__(self, render_mode: Optional[str] = None):
-        super().__init__(
-            # no attacks in v0
-            params=PlatoonEnvParams(
-                num_vehicles=10,
-                num_vulns=1,
-                num_attack=0,
-                attack_interval=0,
-                prob_dist = torch.distributions.Normal(
-                    loc=torch.as_tensor(0.0),
-                    scale=torch.as_tensor(0.1),
-                ),
-                sev_dist = torch.distributions.Normal(
-                    loc=torch.as_tensor(0.0),
-                    scale=torch.as_tensor(0.1),
-                )
-            ),
-            render_mode = render_mode,
-        )
+class PlatoonEnvV0(gym.Env):
+    metadata = {
+        "render_modes": [],
+        "reward_threshold": -45,
+    }
+    def __init__(self, render_mode=None):
+        super().__init__()
+        self.action_space = spaces.Discrete(11)
+        self.observation_space = spaces.Box(low=0,high=1,shape=(10,))
+        self.state = np.zeros((10,), dtype=np.float32)
+        self.steps_done = 0
+    
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.state = np.zeros((10,), dtype=np.float32)
+        self.steps_done = 0
+        return self.state.copy(), {}
 
-        self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
-        # member/not only
-        self.observation_space = gym.spaces.Box(
-            low=np.zeros(self.params.num_vehicles, dtype=np.float32),
-            high=np.ones(self.params.num_vehicles, dtype=np.float32),
-        )
+    def step(self, action: int):
+        if action != 0:
+            self.state[action-1] = 1-self.state[action-1]
+        self.steps_done += 1
+        return self.state.copy(), -np.sum(1-self.state), False, self.steps_done > 15, {}
 
-    def get_observation(self) -> np.ndarray:
-        return (self.state[:,:,0].sum(dim=1) > 0).float().numpy()
+class PlatoonEnvV1(gym.Env):
+    metadata = {
+        "render_modes": [],
+        "reward_threshold": -48,
+    }
+    def __init__(self, render_mode=None):
+        super().__init__()
+        self.action_space = spaces.Discrete(11)
+        self.observation_space = spaces.Box(low=-10,high=1,shape=(20,))
+        self.reset()
+    
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.state = np.zeros((10,), dtype=np.float32)
 
-    def get_done(self) -> bool:
-        return False
+        self.values = np.zeros((10,), dtype=np.float32)
+        a = self.np_random.integers(0,9)
+        b = a
+        while b == a:
+            b = self.np_random.integers(0,9)
+        self.values[a] = -10
+        self.values[b] = -10
 
-    def get_truncated(self) -> bool:
-        return self.current_step >= self.params.num_vehicles
+        self.steps_done = 0
+        
+        return np.hstack((self.state, self.values)), {}
 
-    def get_reward(self) -> float:
-        # reward starts at zero
-        reward = torch.tensor(0, dtype=torch.int32)
-        # lose points for each vehicle outside the platoon
-        reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
-        return reward.item()
+    def step(self, action: int):
+        if action != 0:
+            self.state[action-1] = 1-self.state[action-1]
+        self.steps_done += 1
+        return np.hstack((self.state, self.values)), (-np.sum(1-self.state)) + np.sum(self.state * self.values), False, self.steps_done >= 10, {}
 
-class PlatoonEnvV1(PlatoonEnv):
-    def __init__(self, render_mode: Optional[str] = None):
-        super().__init__(
-            params=PlatoonEnvParams(
-                num_vehicles = 10,
-                num_vulns = 1,
-                num_attack = 0,
-                attack_interval = 0,
-                prob_dist = torch.distributions.Normal(
-                    loc=torch.as_tensor(0.0),
-                    scale=torch.as_tensor(0.1),
-                ),
-                sev_dist = torch.distributions.Normal(
-                    loc=torch.as_tensor(0.0),
-                    scale=torch.as_tensor(0.1),
-                )
-            ),
-            render_mode = render_mode,
-        )
 
-        self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
-        # # member/not only
-        # self.observation_space = gym.spaces.Box(
-        #     low=np.zeros(self.params.num_vehicles, dtype=np.float32),
-        #     high=np.ones(self.params.num_vehicles, dtype=np.float32),
-        # )
-        self.observation_space = MyBox(
-            # member, prob, sev, compromised
-            low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-            high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-        )
+class PlatoonEnvV2(gym.Env):
+    metadata = { "render_modes": [] }
+    def __init__(self, render_mode=None):
+        super().__init__()
+        self.action_space = spaces.Discrete(11)
+        self.observation_space = spaces.Box(low=-10,high=10,shape=(20,))
+        self.reset()
+    
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.state = np.zeros((10,), dtype=np.float32)
+        self.values = self.np_random.integers(-10,10, size=(10,)).astype(float)
+        self.steps_done = 0
+        return np.hstack((self.state, self.values)), {}
+
+    def step(self, action: int):
+        if action != 0:
+            self.state[action-1] = 1-self.state[action-1]
+        self.steps_done += 1
+        return np.hstack((self.state, self.values)), (-np.sum(1-self.state)) + np.sum(self.state * self.values), False, self.steps_done >= 10, {}
+
+
+# class PlatoonEnvV2(PlatoonEnv):
+#     def __init__(self, render_mode: Optional[str] = None):
+#         super().__init__(
+#             params=PlatoonEnvParams(
+#                 num_vehicles = 10,
+#                 num_vulns = 3,
+#                 num_attack = 1,
+#                 attack_interval = 2,
+#                 prob_dist = torch.distributions.Normal(
+#                     loc=torch.as_tensor(0.05),
+#                     scale=torch.as_tensor(0.1),
+#                 ),
+#                 sev_dist = torch.distributions.Normal(
+#                     loc=torch.as_tensor(1.0),
+#                     scale=torch.as_tensor(1.0),
+#                 )
+#             ),
+#             render_mode = render_mode,
+#         )
+
+#         self.action_space = spaces.Discrete(self.params.num_vehicles + 1) # include no-op
+#         # # member/not only
+#         # self.observation_space = spaces.Box(
+#         #     low=np.zeros(self.params.num_vehicles, dtype=np.float32),
+#         #     high=np.ones(self.params.num_vehicles, dtype=np.float32),
+#         # )
+#         self.observation_space = MyBox(
+#             # member, prob, sev, compromised
+#             low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+#             high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
+#         )
 
     
-    def get_observation(self) -> np.ndarray:
-        return self.state.numpy()
-        # return self.state.flatten().numpy()
+#     def get_observation(self) -> np.ndarray:
+#         return self.state.numpy()
+#         # return self.state.flatten().numpy()
 
-    def get_done(self) -> bool:        
-        # done = self.current_step >= self.num_steps
-        return False
+#     def get_done(self) -> bool:        
+#         # done = self.current_step >= self.num_steps
+#         return False
 
-    def get_truncated(self) -> bool:
-        return self.current_step >= self.params.num_vehicles
+#     def get_truncated(self) -> bool:
+#         return self.current_step >= 25
 
-    def get_reward(self) -> float:
-        # reward starts at zero
-        reward = torch.tensor(0, dtype=torch.int32)
-        # lose points for each vehicle outside the platoon
-        reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
-        # lose points for each compromise inside the platoon based on sqrt(severity)
-        reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
+#     def get_reward(self) -> float:
+#         # reward starts at zero
+#         reward = torch.tensor(0, dtype=torch.int32)
+#         # lose points for each vehicle outside the platoon
+#         reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
+#         # lose points for each compromise inside the platoon based on sqrt(severity)
+#         reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
 
-        return reward.item()
-
-class PlatoonEnvV2(PlatoonEnv):
-    def __init__(self, render_mode: Optional[str] = None):
-        super().__init__(
-            params=PlatoonEnvParams(
-                num_vehicles = 10,
-                num_vulns = 3,
-                num_attack = 1,
-                attack_interval = 2,
-                prob_dist = torch.distributions.Normal(
-                    loc=torch.as_tensor(0.05),
-                    scale=torch.as_tensor(0.1),
-                ),
-                sev_dist = torch.distributions.Normal(
-                    loc=torch.as_tensor(1.0),
-                    scale=torch.as_tensor(1.0),
-                )
-            ),
-            render_mode = render_mode,
-        )
-
-        self.action_space = gym.spaces.Discrete(self.params.num_vehicles + 1) # include no-op
-        # # member/not only
-        # self.observation_space = gym.spaces.Box(
-        #     low=np.zeros(self.params.num_vehicles, dtype=np.float32),
-        #     high=np.ones(self.params.num_vehicles, dtype=np.float32),
-        # )
-        self.observation_space = MyBox(
-            # member, prob, sev, compromised
-            low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-            high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-        )
-
-    
-    def get_observation(self) -> np.ndarray:
-        return self.state.numpy()
-        # return self.state.flatten().numpy()
-
-    def get_done(self) -> bool:        
-        # done = self.current_step >= self.num_steps
-        return False
-
-    def get_truncated(self) -> bool:
-        return self.current_step >= 25
-
-    def get_reward(self) -> float:
-        # reward starts at zero
-        reward = torch.tensor(0, dtype=torch.int32)
-        # lose points for each vehicle outside the platoon
-        reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
-        # lose points for each compromise inside the platoon based on sqrt(severity)
-        reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
-
-        return reward.item()
+#         return reward.item()
 
 
 # https://github.com/0xangelo/gym-cartpole-swingup/blob/master/gym_cartpole_swingup/__init__.py
-from gym.envs.registration import register
+from gymnasium.envs.registration import register
 
 register(
     id="Platoon-v0",
     entry_point="platoonenv:PlatoonEnvV0",
     # max_episode_steps=20,
-    reward_threshold=-45
+    reward_threshold=-45,
 )
 
 register(
     id="Platoon-v1",
     entry_point="platoonenv:PlatoonEnvV1",
     # max_episode_steps=20,
-    reward_threshold=-45 # -157 is best I've seen so far after 4 hours of training and 1.3M steps
+    reward_threshold=-48 # -157 is best I've seen so far after 4 hours of training and 1.3M steps
 )
 
 register(
     id="Platoon-v2",
     entry_point="platoonenv:PlatoonEnvV2",
     # max_episode_steps=20,
-    reward_threshold=-45
+    # reward_threshold=-45
 )
 
+try:
+    from ray.tune.registry import register_env
+    register_env("Platoon-v0", lambda config: PlatoonEnvV0())
+    register_env("Platoon-v1", lambda config: PlatoonEnvV1())
+    register_env("Platoon-v2", lambda config: PlatoonEnvV2())
+except ImportError:
+    pass
 # todo: if a vuln attack fails, it should be considered failed forever (set probability to 0)
