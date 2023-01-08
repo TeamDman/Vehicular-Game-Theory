@@ -1,5 +1,6 @@
 import gymnasium as gym
 from gymnasium import spaces
+from gymnasium.envs.registration import EnvSpec
 import torch
 from torch import Tensor
 from typing import Literal, Optional, Tuple, Union
@@ -213,7 +214,7 @@ class PlatoonEnv(gym.Env[np.ndarray, int]):
             self.isopen = False
             self.screen = None
 
-class PlatoonEnvV0(gym.Env):
+class InOutEnv(gym.Env):
     metadata = {
         "render_modes": [],
         "reward_threshold": -45,
@@ -224,6 +225,12 @@ class PlatoonEnvV0(gym.Env):
         self.observation_space = spaces.Box(low=0,high=1,shape=(10,))
         self.state = np.zeros((10,), dtype=np.float32)
         self.steps_done = 0
+        self.spec = EnvSpec(
+            id="Platoon-v0",
+            entry_point="platoonenv:InOutEnv",
+            max_episode_steps=20,
+            reward_threshold=-45,
+        )
     
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -237,7 +244,7 @@ class PlatoonEnvV0(gym.Env):
         self.steps_done += 1
         return self.state.copy(), -np.sum(1-self.state), False, self.steps_done > 15, {}
 
-class PlatoonEnvV1(gym.Env):
+class InOutDangerEnv(gym.Env):
     metadata = {
         "render_modes": [],
         "reward_threshold": -48,
@@ -247,6 +254,12 @@ class PlatoonEnvV1(gym.Env):
         self.action_space = spaces.Discrete(11)
         self.observation_space = spaces.Box(low=-10,high=1,shape=(20,))
         self.reset()
+        self.spec = EnvSpec(
+            id="Platoon-v1",
+            entry_point="platoonenv:InOutDangerEnv",
+            max_episode_steps=20,
+            reward_threshold=-48
+        )
     
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -271,13 +284,59 @@ class PlatoonEnvV1(gym.Env):
         return np.hstack((self.state, self.values)), (-np.sum(1-self.state)) + np.sum(self.state * self.values), False, self.steps_done >= 10, {}
 
 
-class PlatoonEnvV2(gym.Env):
+class InOutDangerLongEnv(gym.Env):
+    metadata = {
+        "render_modes": [],
+        "reward_threshold": -60,
+    }
+    def __init__(self, render_mode=None):
+        super().__init__()
+        self.action_space = spaces.Discrete(11)
+        self.observation_space = spaces.Box(low=-10,high=1,shape=(20,))
+        self.reset()
+        self.spec = EnvSpec(
+            id="Platoon-v1",
+            entry_point="platoonenv:InOutDangerEnv",
+            max_episode_steps=20,
+            reward_threshold=-48
+        )
+    
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.state = np.zeros((10,), dtype=np.float32)
+
+        self.values = np.zeros((10,), dtype=np.float32)
+        a = self.np_random.integers(0,9)
+        b = a
+        while b == a:
+            b = self.np_random.integers(0,9)
+        self.values[a] = -10
+        self.values[b] = -10
+
+        self.steps_done = 0
+        
+        return np.hstack((self.state, self.values)), {}
+
+    def step(self, action: int):
+        if action != 0:
+            self.state[action-1] = 1-self.state[action-1]
+        self.steps_done += 1
+        return np.hstack((self.state, self.values)), (-np.sum(1-self.state)) + np.sum(self.state * self.values), False, self.steps_done >= 16, {}
+
+
+class InOutValueEnv(gym.Env):
     metadata = { "render_modes": [] }
     def __init__(self, render_mode=None):
         super().__init__()
         self.action_space = spaces.Discrete(11)
         self.observation_space = spaces.Box(low=-10,high=10,shape=(20,))
         self.reset()
+        self.spec = EnvSpec(
+            id="Platoon-v2",
+            entry_point="platoonenv:InOutValueEnv",
+            max_episode_steps=20,
+            reward_threshold=0, #-45
+        )
     
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -353,30 +412,30 @@ from gymnasium.envs.registration import register
 
 register(
     id="Platoon-v0",
-    entry_point="platoonenv:PlatoonEnvV0",
-    # max_episode_steps=20,
+    entry_point="platoonenv:InOutEnv",
+    max_episode_steps=20,
     reward_threshold=-45,
 )
 
 register(
     id="Platoon-v1",
-    entry_point="platoonenv:PlatoonEnvV1",
-    # max_episode_steps=20,
-    reward_threshold=-48 # -157 is best I've seen so far after 4 hours of training and 1.3M steps
+    entry_point="platoonenv:InOutDangerEnv",
+    max_episode_steps=20,
+    reward_threshold=-48
 )
 
 register(
     id="Platoon-v2",
-    entry_point="platoonenv:PlatoonEnvV2",
-    # max_episode_steps=20,
-    # reward_threshold=-45
+    entry_point="platoonenv:InOutValueEnv",
+    max_episode_steps=20,
+    reward_threshold=0,
 )
 
 try:
     from ray.tune.registry import register_env
-    register_env("Platoon-v0", lambda config: PlatoonEnvV0())
-    register_env("Platoon-v1", lambda config: PlatoonEnvV1())
-    register_env("Platoon-v2", lambda config: PlatoonEnvV2())
+    register_env("Platoon-v0", lambda config: InOutEnv())
+    register_env("Platoon-v1", lambda config: InOutDangerEnv())
+    register_env("Platoon-v2", lambda config: InOutValueEnv())
 except ImportError:
     pass
 # todo: if a vuln attack fails, it should be considered failed forever (set probability to 0)
