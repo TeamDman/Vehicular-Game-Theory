@@ -349,7 +349,21 @@ class InOutValueEnv(gym.Env):
         if action != 0:
             self.state[action-1] = 1-self.state[action-1]
         self.steps_done += 1
-        return np.hstack((self.state, self.values)), (-np.sum(1-self.state)) + np.sum(self.state * self.values), False, self.steps_done >= 10, {}
+
+        next_obs = np.hstack((self.state, self.values))
+
+        reward = 0
+        # gain points using value of each member
+        reward += np.sum(self.state * self.values)
+        # lose 1 point for each non-member
+        reward -= np.sum(1-self.state)
+        # lose 10 points for each member value less than 0
+        # reward -= np.sum(self.state * (self.values < 0) * 10)
+
+        done = False
+        trunc = self.steps_done >= 10
+        info = {}
+        return next_obs, reward, done, trunc, info
 
 
 # class PlatoonEnvV2(PlatoonEnv):
