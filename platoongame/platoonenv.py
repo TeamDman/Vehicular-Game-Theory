@@ -179,7 +179,6 @@ class InOutDangerEnv(gym.Env):
                     # draw cube value
                     canvas.font = "20px Consolas"
                     canvas.fill_style = "black"
-                    reward_total += info['reward']
                     canvas.fill_text(
                         text=f"{info['values'][i]}",
                         x = x,
@@ -287,7 +286,6 @@ class InOutValueEnv(gym.Env):
                     # draw cube value
                     canvas.font = "20px Consolas"
                     canvas.fill_style = "black"
-                    reward_total += info['reward']
                     canvas.fill_text(
                         text=f"{info['values'][i]}",
                         x = x,
@@ -340,79 +338,144 @@ class InOutValueEnv(gym.Env):
 
         return next_obs, reward, done, trunc, info
 
+class InOutValueProbEnv(gym.Env):
+    metadata = {
+        "render_modes": ["canvas"],
+    }
+    def __init__(self, render_mode: Optional[str] = None):
+        super().__init__()
+        self.spec = EnvSpec(
+            id="Platoon-v3",
+            entry_point="platoonenv:InOutValueProbEnv",
+            max_episode_steps=20,
+            # reward_threshold=0, #-45
+        )
+        self.num_vehicles = 10
+        self.action_space = spaces.Discrete(self.num_vehicles + 1) # include no-op
+        self.observation_space = spaces.Box(low=-10,high=10,shape=(30,)) # value, member, prod
+        self.reset()
 
-# class PlatoonEnvV2(PlatoonEnv):
-    
-#     def __init__(self, render_mode: Optional[str] = None):
-#         super().__init__(
-#             params=PlatoonEnvParams(
-#                 num_vehicles = 10,
-#                 num_vulns = 3,
-#                 num_attack = 1,
-#                 attack_interval = 2,
-#                 prob_dist = torch.distributions.Normal(
-#                     loc=torch.as_tensor(0.05),
-#                     scale=torch.as_tensor(0.1),
-#                 ),
-#                 sev_dist = torch.distributions.Normal(
-#                     loc=torch.as_tensor(1.0),
-#                     scale=torch.as_tensor(1.0),
-#                 )
-#             ),
-#             render_mode = render_mode,
-#         )
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.state = np.zeros((10,), dtype=np.float32)
+        self.values = self.np_random.integers(-10,1, size=(10,)).astype(np.float32)
+        self.probs = self.np_random.uniform(0,1, size=(10,)).astype(np.float32)
+        self.steps_done = 0
+        self.render_infos = []
+        return np.hstack((self.state, self.values, self.probs)), {}
 
-#         self.action_space = spaces.Discrete(self.params.num_vehicles + 1) # include no-op
-#         # # member/not only
-#         # self.observation_space = spaces.Box(
-#         #     low=np.zeros(self.params.num_vehicles, dtype=np.float32),
-#         #     high=np.ones(self.params.num_vehicles, dtype=np.float32),
-#         # )
-#         self.observation_space = MyBox(
-#             # member, prob, sev, compromised
-#             low=torch.tensor((0,0.0,0,0)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-#             high=torch.tensor((1,1.0,5,1)).repeat(self.params.num_vulns,1).repeat(self.params.num_vehicles,1,1).numpy(),
-#         )
+    def render(self):
+        vehicle_width=100
+        vehicle_height=20
+        padding=6
+        num_vehicles = self.state.shape[0]
+        width = num_vehicles * (vehicle_width + padding) + 400
+        height = len(self.render_infos) * (vehicle_height + padding)
+        canvas = Canvas(width=width, height=height)
+        reward_total = 0
+        with hold_canvas(canvas):
+            y = padding
+            for info in self.render_infos:
+                x = padding
+                for i in range(num_vehicles):
+                    # draw highlight for last action
+                    # offset by 1 to account for no-op
+                    if i + 1 == info["action"]:
+                        canvas.fill_style="red"
+                        canvas.fill_rect(
+                            x=x-padding/2,
+                            y=y-padding/2,
+                            width=vehicle_width + padding,
+                            height=vehicle_height + padding,
+                        )
+                    # draw highlight for last attacker action
+                    if i == info["attacker_action"]:
+                        canvas.fill_style="purple"
+                        canvas.fill_rect(
+                            x=x-padding/2,
+                            y=y-padding/2,
+                            width=vehicle_width//2 if i+1 == info["action"] else vehicle_width + padding,
+                            height=vehicle_height + padding,
+                        )
 
-    
-#     def get_observation(self) -> np.ndarray:
-#         return self.state.numpy()
-#         # return self.state.flatten().numpy()
+                    # draw cube
+                    if info["state"][i] == 1:
+                        # if info["probs"][i] == 1:
+                        #     canvas.fill_style = "#969"
+                        # else:
+                        canvas.fill_style = "#55F"
+                    else:
+                        canvas.fill_style = "gray"
+                    canvas.fill_rect(
+                        x=x,
+                        y=y,
+                        width=vehicle_width,
+                        height=vehicle_height,
+                    )
 
-#     def get_done(self) -> bool:        
-#         # done = self.current_step >= self.num_steps
-#         return False
+                    # draw cube value
+                    canvas.font = "14px Consolas"
+                    if info["probs"][i] == 1:
+                        canvas.fill_style = "white"
+                    else:
+                        canvas.fill_style = "black"
 
-#     def get_truncated(self) -> bool:
-#         return self.current_step >= 25
+                    canvas.fill_text(
+                        text=f"{info['values'][i]} | {info['probs'][i]:.2f}",
+                        x = x+padding,
+                        y = y + vehicle_height - padding//2,
+                    )
+                    x += vehicle_width + padding
+                # draw reward string     
+                canvas.font = "20px Consolas"
+                canvas.fill_style = "black"
+                reward_total += info['reward']
+                canvas.fill_text(
+                    text=f"action:{info['action']:02d}, reward:{info['reward']:+.03f} ({reward_total:+.03f})",
+                    x = x,
+                    y = y + vehicle_height - padding//2,
+                )
+                y += vehicle_height + padding
 
-#     def get_reward(self) -> float:
-#         # reward starts at zero
-#         reward = torch.tensor(0, dtype=torch.int32)
-#         # lose points for each vehicle outside the platoon
-#         reward -= ((self.state[:,:,0].sum(dim=1)==0)).sum()
-#         # lose points for each compromise inside the platoon based on sqrt(severity)
-#         reward -= (self.state[:,:,2] * self.state[:,:,3]).sqrt().sum().int()
+            
+        return canvas
 
-#         return reward.item()
+    def step(self, action: int):
+        if action != 0:
+            self.state[action-1] = 1-self.state[action-1]
 
+        attacker_action = self.np_random.integers(0, self.num_vehicles)
+        prob = self.probs[attacker_action]
+        roll = self.np_random.random()
+        self.probs[attacker_action] = int(prob > roll)
 
+        next_obs = np.hstack((self.state, self.values, self.probs))
 
+        reward = 0
+        # lose 1 point for each non-member
+        reward -= np.sum(1-self.state)
+        # lose points for each compromised member scaled by severity
+        compromised = np.all((self.probs == 1, self.state == 1), axis=0)
+        reward += np.sum(self.values * compromised)
+        # scale reward
+        reward /= 100.0 # scale rewards between -1 and 1 to improve PPO training
 
-# from ipycanvas import Canvas, hold_canvas
-# from IPython.display import display
+        done = False
+        trunc = self.steps_done >= 10
+        info = {}
 
-# def render_row(num_vehicles, member_indices, highlight_indices)
-# c1 = Canvas(width=200,height=200)
-# c2 = Canvas(width=200,height=200)
-# c1.fill_rect(0,0,25,25)
-# c2.fill_style="red"
-# c2.fill_rect(0,0,25,25)
-# display(c1)
-# display(c2)
+        # track rendering info
+        self.render_infos.append({
+            "action": action,
+            "attacker_action": attacker_action,
+            "reward": reward,
+            "state": self.state.copy(),
+            "values": self.values.copy(),
+            "probs": self.probs.copy(),
+        })
+        self.steps_done += 1
 
-
-
+        return next_obs, reward, done, trunc, info
 
 
 # https://github.com/0xangelo/gym-cartpole-swingup/blob/master/gym_cartpole_swingup/__init__.py
@@ -439,11 +502,19 @@ register(
     reward_threshold=500,
 )
 
+register(
+    id="Platoon-v3",
+    entry_point="platoonenv:InOutValueProbEnv",
+    max_episode_steps=20,
+    reward_threshold=500,
+)
+
 try:
     from ray.tune.registry import register_env
     register_env("Platoon-v0", lambda config: InOutEnv())
     register_env("Platoon-v1", lambda config: InOutDangerEnv())
     register_env("Platoon-v2", lambda config: InOutValueEnv())
+    register_env("Platoon-v3", lambda config: InOutValueProbEnv())
 except ImportError:
     pass
 # todo: if a vuln attack fails, it should be considered failed forever (set probability to 0)
