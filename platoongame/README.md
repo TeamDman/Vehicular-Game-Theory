@@ -53,3 +53,15 @@ Evaluating the probability of a compromise is a one time thing, either it won't 
 
 1509.02971.pdf CONTINUOUS CONTROL WITH DEEP REINFORCEMENT LEARNING  
 p4. We create a copy of the actor and critic networks, Q′(s, a|θQ′) and μ′(s|θμ′) respectively, that are used for calculating the target values. The weights of these target networks are then updated by having them slowly track the learned networks: θ′ ← τ θ + (1 − τ )θ′ with τ  1. This means that the target values are constrained to change slowly, greatly improving the stability of learning. 
+
+
+# Notes
+
+RLLib slack response regarding my PPO not working
+
+---
+
+1. I personally would not use curiosity exploration until after I got a baseline version working first.
+2. Does your observation include information about which row it is deciding an action for. You are not using framestacking or an rnn policy in your config. A pure feedforward policy could not learn to keep track of that information on its own.
+3. You want to keep your rewards smaller preferably between 0 and 1. Also I have found that I get much better results it I return an instantaneous reward rather than cumulative on each step. So for example +/- for the square that was just turned on. Then at the end you can supply a terminal reward for the overall score. The reason is because targrt values will based on the return which will be a discounted sum of all the rewards in that episode. That adds a lot of extra counting of rewards and it makes it harder to distinguish good actions from bad ones (credit assignment).
+4. Rllib's implementation of value clipping will Clio if the values loss is greater than 10. I would bet, given your rewards, that almost all of your experience steps are bring clipped. When a step is clipped, it will not be learned on. You can set the vf_clip to float("inf") to disable and see if that makes a difference. Whatcha or for Nan's during training if you do that though. (edited) 

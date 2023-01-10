@@ -25,5 +25,8 @@
         "tqdm",
         "vulns",
         "yeet"
+    ],
+    "notebook.displayOrder": [
+        "image/png"
     ]
 }
