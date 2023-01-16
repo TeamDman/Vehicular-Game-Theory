@@ -3,7 +3,7 @@ from gymnasium import spaces
 from gymnasium.envs.registration import EnvSpec
 import torch
 from torch import Tensor
-from typing import Literal, Optional, Tuple, Union
+from typing import Any, Dict, Literal, Optional, Tuple, Union
 from dataclasses import dataclass
 import numpy as np
 import random
@@ -667,18 +667,21 @@ class InOutValueProbCyclingMonitoringEnv(gym.Env):
         "render_modes": ["canvas"],
         "render_fps": 10,
     }
+    default_env_config ={
+        "num_vehicles": 10,
+        "steps_before_truncation": 100,
+        "attack_interval": 2,
+        "cycle_interval": 2,
+        "cycle_num": 1,
+    }
     def __init__(
         self,
         render_mode: Optional[str] = "canvas",
-        env_config={
-            "num_vehicles": 10,
-            "steps_before_truncation": 100,
-            "attack_interval": 2,
-            "cycle_interval": 2,
-            "cycle_num": 1,
-        },
+        env_config: Optional[Dict[str, Any]] = None,
     ):
         super().__init__()
+        env_config = env_config or {}
+        env_config = {**self.default_env_config, **env_config}
         self.spec = EnvSpec(
             id="Platoon-v4",
             entry_point="platoonenv:InOutValueProbCyclingEnv",
@@ -716,17 +719,11 @@ class InOutValueProbCyclingMonitoringEnv(gym.Env):
             }
         ]
 
-        return self.get_observation()
+        return self.get_observation(), self.render_infos[-1]
 
     def get_observation(self):
         obs = np.hstack((self.state, self.values, self.obs_probs, self.modes))
-        info = {
-            "state": self.state,
-            "values": self.values,
-            "probs": self.probs,
-            "modes": self.modes,
-        }
-        return obs, info
+        return obs
 
     def step(self, action: int):
         # agent action
@@ -759,7 +756,7 @@ class InOutValueProbCyclingMonitoringEnv(gym.Env):
 
         done = False
         trunc = self.steps_done >= self.steps_before_truncation
-        next_obs, info = self.get_observation()
+        next_obs = self.get_observation()
 
         # environment behaviour - cycling
         if self.steps_done % self.cycle_interval == 0:
@@ -775,7 +772,7 @@ class InOutValueProbCyclingMonitoringEnv(gym.Env):
         self.modes = 1-self.modes
 
         # track rendering info
-        self.render_infos.append({
+        info = {
             "action": action,
             "attacker_action": attacker_action,
             "reward": reward,
@@ -785,7 +782,8 @@ class InOutValueProbCyclingMonitoringEnv(gym.Env):
             "obs_probs": self.obs_probs.copy(),
             "modes": self.modes.copy(),
             "cycled": indices
-        })
+        }
+        self.render_infos.append(info)
         self.steps_done += 1
 
         return next_obs, reward, done, trunc, info
