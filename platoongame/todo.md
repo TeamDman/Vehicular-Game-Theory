@@ -1,3 +1,37 @@
+# Todo
+
+## My own
+
+- [ ] Rename "sub-game" and "platoon-game" to be "environments" instead with better names
+- [ ] inline todo items
+
+## Meeting notes from 2023-01-23
+
+- Make sure to use same term everywhere
+    - [x] CAV vs VANET vs Autonomous vehicles
+- [x] Move RL to 3; Reflow to only introduce RL after subgame
+- [ ] Add chapter to background for applications of game theory and RL in security problems with platoons and vehicles
+- [ ] Add chapter to background for surveys of vehicle threats and defenses before [2.3 risk estimation]
+- [ ] Add chapter in background after 2.4 for platooning - autonomous and not
+- [x] Break out methodology into two distinct chapters
+- [ ] Review platoon formalization to ensure matches latest
+
+Prepare a response to question
+- Why did you use PPO/RayRLLib instead of your own impl?
+
+- intra, risk, game, vehicle
+- Intra-vehicle security-conscious game formulation and solving
+- Inter-vehicle security-conscious platoon formalization and operation
+
+- framework to dynamically form platoon by evaluating risk in model free environments
+- using game theory in the vehicle
+
+
+If bored, jump ahead Ch 2. theory and Ch 6. results
+Scenarios, results, metrics
+
+## Meeting notes from 2023-01-16
+
 - dynamic
 - platoon
 - formation

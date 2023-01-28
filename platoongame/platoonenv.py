@@ -913,6 +913,281 @@ class InOutValueProbCyclingMonitoringEnv(gym.Env):
             
         return canvas
 
+class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
+    metadata = {
+        "render_modes": ["canvas"],
+        "render_fps": 10,
+    }
+    default_env_config ={
+        "num_vehicles": 10,
+        "num_vulns_min": 1,
+        "num_vulns_max": 4,
+        "steps_before_truncation": 100,
+        "attack_interval": 2,
+        "cycle_interval": 2,
+        "cycle_num": 1,
+    }
+    def __init__(
+        self,
+        render_mode: Optional[str] = "canvas",
+        env_config: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__()
+        env_config = env_config or {}
+        env_config = {**self.default_env_config, **env_config}
+        self.spec = EnvSpec(
+            id="Platoon-v4",
+            entry_point="platoonenv:InOutValueProbCyclingEnv",
+            max_episode_steps=env_config["steps_before_truncation"],
+            # reward_threshold=0, #-45
+        )
+        self.num_vehicles = env_config["num_vehicles"]
+        self.cycle_interval = env_config["cycle_interval"]
+        self.cycle_num = env_config["cycle_num"]
+        self.steps_before_truncation=env_config["steps_before_truncation"]
+        self.attack_interval = env_config["attack_interval"]
+        self.num_vulns_min = env_config["num_vulns_min"]
+        self.num_vulns_max = env_config["num_vulns_max"]
+        self.action_space = spaces.Discrete(self.num_vehicles + 1) # include no-op
+        self.observation_space = spaces.Box(low=-10,high=10,shape=(self.num_vehicles * (2+2*self.num_vulns_max),))
+        self.reset()
+
+    def create_vehicles(self, num_vehicles: int):
+        values = np.around(np.clip(self.np_random.normal(-4,1, size=(num_vehicles,self.num_vulns_max)).astype(np.float32),-10,0))
+        probs = self.np_random.uniform(0,1, size=(num_vehicles,self.num_vulns_max)).astype(np.float32)
+
+        # get the indices of each row in a random order
+        random_order = np.argsort(self.np_random.random((num_vehicles,self.num_vulns_max)), axis=1)
+
+        # randomly select vulnerabilities to prune
+        prune_idx = self.np_random.random((num_vehicles,self.num_vulns_max)) < 0.5
+        # grab num_vulns_min indices from the random order to preserve
+        keep = random_order[:,:self.num_vulns_min]
+        # ensure the preserved indices are not marked to be pruned
+        prune_idx[np.arange(num_vehicles)[:,None],keep] = False
+
+        # commit prune
+        values[prune_idx] = 0
+        probs[prune_idx] = 0
+
+        return values, probs
+
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        # every vehicle starts out of the platoon
+        self.members = np.zeros((self.num_vehicles,), dtype=np.float32)
+
+        self.values, self.probs = self.create_vehicles(self.num_vehicles)
+
+        self.obs_probs = self.probs.copy()
+        self.modes = np.zeros((self.num_vehicles,), dtype=np.float32)
+        self.steps_done = 0
+        self.render_infos = [ # push initial state
+            {
+                "action": -1,
+                "attacker_action": -1,
+                "reward": 0,
+                "state": self.members.copy(),
+                "values": self.values.copy(),
+                "probs": self.probs.copy(),
+                "obs_probs": self.obs_probs.copy(),
+                "modes": self.modes.copy(),
+                "cycled": [],
+            }
+        ]
+
+        return self.get_observation(), self.render_infos[-1]
+
+    def get_observation(self):
+        obs = np.hstack((self.modes, self.members, *self.values, *self.obs_probs))
+        return obs
+
+    def step(self, action: int):
+        # agent action
+        if action != 0:
+            mode = self.modes[action-1]
+            if mode == 0: # membership toggle
+                self.members[action-1] = 1-self.members[action-1]
+            elif mode == 1: # monitoring updates observed prob
+                self.obs_probs[action-1] = self.probs[action-1]
+            else:
+                raise ValueError(f"mode {mode} not supported")
+
+        # environment behaviour - attacker action
+        attacker_action = None
+        if self.steps_done % self.attack_interval == 0:
+            attacker_action = self.np_random.integers(0, self.num_vehicles)
+            probs = self.probs[attacker_action,:]
+            roll = self.np_random.random(size=(self.num_vulns_max,))
+            self.probs[attacker_action] = (probs > roll).astype(np.float32)
+
+        # gather action outcome info before further environmental behaviours
+        reward = 0
+        # lose 1 point for each non-member
+        reward -= np.sum(1-self.members)
+        # add values for vehicles which have prob 1 and are members
+        reward += np.sum((self.values * (self.probs == 1))[self.members == 1])
+        # scale reward
+        reward /= 100*self.num_vehicles # scale rewards between -1 and 1 to improve PPO training
+
+        done = False
+        trunc = self.steps_done >= self.steps_before_truncation
+        next_obs = self.get_observation()
+
+        # environment behaviour - cycling
+        if self.steps_done % self.cycle_interval == 0:
+            # kick them out of the platoon, give them a new value, and reset their prob to simulate a new vehicle
+            indices = self.np_random.choice(self.num_vehicles, self.cycle_num, replace=False)
+            self.members[indices] = 0
+            self.values[indices], self.probs[indices] = self.create_vehicles(self.cycle_num)
+        else:
+            indices = []
+
+        # environment behaviour - flip modes
+        self.modes = 1-self.modes
+
+        # track rendering info
+        info = {
+            "action": action,
+            "attacker_action": attacker_action,
+            "reward": reward,
+            "state": self.members.copy(),
+            "values": self.values.copy(),
+            "probs": self.probs.copy(),
+            "obs_probs": self.obs_probs.copy(),
+            "modes": self.modes.copy(),
+            "cycled": indices
+        }
+        self.render_infos.append(info)
+        self.steps_done += 1
+
+        return next_obs, reward, done, trunc, info
+
+    def render(self):
+        vehicle_width=100
+        vehicle_height=4 + 16 * self.num_vulns_max
+        padding=6
+        width = self.num_vehicles * (vehicle_width + padding) + 400
+        height = (len(self.render_infos)+10) * (vehicle_height + padding)
+        canvas = Canvas(width=width, height=height)
+        reward_total = 0
+
+        x = padding
+        y = padding
+        # draw legend
+        def label(color, text):
+            nonlocal y
+            canvas.fill_style=color
+            canvas.fill_rect(
+                x=x,
+                y=y,
+                width=10,
+                height=10,
+            )
+            canvas.font = "14px Consolas"
+            canvas.fill_style = "black"
+            canvas.fill_text(
+                text=text,
+                x = x + 15,
+                y = y + 10,
+            )
+            y += vehicle_height + padding
+        label("#55F", "in platoon")
+        label("gray", "out of platoon")
+        label("red", "agent action")
+        label("purple", "attacker action")
+        label("yellow", "vehicle cycled")
+        label("brown", "monitoring mode")
+        label("white", "white text means compromised")
+        y += padding
+
+        with hold_canvas(canvas):
+            for info in self.render_infos:
+                x = padding
+                for i in range(self.num_vehicles):
+                    # draw cube
+                    if info["state"][i] == 1:
+                        # if info["probs"][i] == 1:
+                        #     canvas.fill_style = "#969"
+                        # else:
+                        canvas.fill_style = "#55F"
+                    else:
+                        canvas.fill_style = "gray"
+                    canvas.fill_rect(
+                        x=x,
+                        y=y,
+                        width=vehicle_width,
+                        height=vehicle_height,
+                    )
+
+                    # draw highlight for last action
+                    # offset by 1 to account for no-op
+                    if i + 1 == info["action"]:
+                        canvas.fill_style="red"
+                        canvas.fill_rect(
+                            x=x,
+                            y=y,
+                            width=10,
+                            height=10,
+                        )
+                    # draw highlight for last attacker action
+                    if i == info["attacker_action"]:
+                        canvas.fill_style="purple"
+                        canvas.fill_rect(
+                            x=x+15,
+                            y=y,
+                            width=10,
+                            height=10,
+                        )
+
+                    # draw highlight for cycled vehicles
+                    if i in info["cycled"]:
+                        canvas.fill_style="yellow"
+                        canvas.fill_rect(
+                            x=x+30,
+                            y=y,
+                            width=10,
+                            height=10,
+                        )
+
+                    # draw highlight for vehicle mode
+                    if info["modes"][i] == 1:
+                        canvas.fill_style="brown"
+                        canvas.fill_rect(
+                            x=x+45,
+                            y=y,
+                            width=10,
+                            height=10,
+                        )
+
+                    # draw observed cube value
+                    # text is the observed value while the colour reflects the true value
+                    canvas.font = "14px Consolas"
+                    for j in range(self.num_vulns_max):
+                        if info["probs"][i][j] == 1:
+                            canvas.fill_style = "white"
+                        else:
+                            canvas.fill_style = "black"
+                        canvas.fill_text(
+                            text=f"{info['values'][i][j]:+} | {info['obs_probs'][i][j]:.2f}",
+                            x = x+padding,
+                            y = y + 16 + 16*j,
+                        )
+                    x += vehicle_width + padding
+                # draw reward string     
+                canvas.font = "20px Consolas"
+                canvas.fill_style = "black"
+                reward_total += info['reward']
+                canvas.fill_text(
+                    text=f"action:{info['action']:02d}, reward:{info['reward']:+.03f} ({reward_total:+.03f})",
+                    x = x,
+                    y = y + vehicle_height - padding//2,
+                )
+                y += vehicle_height + padding
+
+            
+        return canvas
+
 
 
 # https://github.com/0xangelo/gym-cartpole-swingup/blob/master/gym_cartpole_swingup/__init__.py
@@ -953,6 +1228,11 @@ register(
     entry_point="platoonenv:InOutValueProbCyclingMonitoringEnv",
 )
 
+register(
+    id="Platoon-v6",
+    entry_point="platoonenv:InOutMultiValueProbCyclingMonitoringEnv",
+)
+
 try:
     from ray.tune.registry import register_env
     register_env("Platoon-v0", lambda config: InOutEnv())
@@ -961,6 +1241,7 @@ try:
     register_env("Platoon-v3", lambda config: InOutValueProbEnv(env_config=config))
     register_env("Platoon-v4", lambda config: InOutValueProbCyclingEnv(env_config=config))
     register_env("Platoon-v5", lambda config: InOutValueProbCyclingMonitoringEnv(env_config=config))
+    register_env("Platoon-v6", lambda config: InOutMultiValueProbCyclingMonitoringEnv(env_config=config))
 except ImportError:
     pass
 # todo: if a vuln attack fails, it should be considered failed forever (set probability to 0)Z
