@@ -953,7 +953,7 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         self.reset()
 
     def create_vehicles(self, num_vehicles: int):
-        values = np.around(np.clip(self.np_random.normal(-4,1, size=(num_vehicles,self.num_vulns_max)).astype(np.float32),-10,0))
+        values = np.around(np.clip(self.np_random.normal(-1,2, size=(num_vehicles,self.num_vulns_max)).astype(np.float32),-5,1))
         probs = self.np_random.uniform(0,1, size=(num_vehicles,self.num_vulns_max)).astype(np.float32)
 
         # get the indices of each row in a random order
@@ -1024,9 +1024,9 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         # gather action outcome info before further environmental behaviours
         reward = 0
         # lose 1 point for each non-member
-        reward -= np.sum(1-self.members)
+        reward -= np.sum(1-self.members) * (2.5**2)
         # add values for vehicles which have prob 1 and are members
-        reward += np.sum((self.values * (self.probs == 1))[self.members == 1])
+        reward += np.sum(((self.values**2) * (self.probs == 1))[self.members == 1])
         # scale reward
         reward /= 100*self.num_vehicles # scale rewards between -1 and 1 to improve PPO training
 
@@ -1043,9 +1043,6 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         else:
             indices = []
 
-        # environment behaviour - flip modes
-        self.modes = 1-self.modes
-
         # track rendering info
         info = {
             "action": action,
@@ -1058,6 +1055,10 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
             "modes": self.modes.copy(),
             "cycled": indices
         }
+
+        # environment behaviour - flip modes
+        self.modes = 1-self.modes
+
         self.render_infos.append(info)
         self.steps_done += 1
 
@@ -1091,7 +1092,7 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
                 x = x + 15,
                 y = y + 10,
             )
-            y += vehicle_height + padding
+            y += vehicle_height//4 + padding
         label("#55F", "in platoon")
         label("gray", "out of platoon")
         label("red", "agent action")
