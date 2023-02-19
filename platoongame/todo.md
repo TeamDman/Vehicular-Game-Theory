@@ -2,17 +2,67 @@
 
 ## My own
 
-- [ ] Rename "sub-game" and "platoon-game" to be "environments" instead with better names
+### Tasks
+
 - [ ] inline todo items
+- [ ] install lovelytensors https://github.com/xl0/lovely-tensors
+- [ ] perform analysis with solo-game derived vehicles
+
+### Questions
+
+- [ ] Why did we use PPO and DQN instead of other algos?
+- [ ] Why did we use Ray RLLib instead of other libraries or our own impl?
+
+## Meeting notes 2023-02-13
+
+- [ ] Finish ch3 by weekend/sunday night
+- [ ] Finish ch4 by weekend/sunday night
+
+- Consider how to boost the security aspect of Ch 4 
+
+## Meeting notes 2023-02-06
+
+- [x] Move platoon background to ch 2
+- [x] Finish glossary adoption
+- [x] fix bibtex warnings
+- [x] Minimax objective section - see inline notes
+- [ ] RL diagram
+- [ ] Platoon objective section - see inline notes
+- [ ] DQN explanation
+    - [ ] Bellman explanation
+- [ ] PPO explanation
+
+
+## Meeting notes from 2023-01-30
+
+- [x] Renaming of sub-game and platoon-game single-vehicle and platoon maybe? Inter- and Intra-platoon 
+- [x] 3.1 Add literature section: game theory for security, including motivation
+- [x] 4.1 Reinforcement learning for security literature including motivation
+- [x] 2. Add section: game theory and security in vehicles
+    - [x] Reference: Aawista Chaudhry, A Framework for Modeling Advanced Persistent Threats in Intelligent Transportation Systems, MSc, 2021.
+- [x] Add technical background on platoon formation
+    - [x] formation
+    - [x] leader election
+    - [ ] consensus mechanisms
+- [x] Add overview tables for symbols used in Ch 3
+- [ ] Bonus: add some content to results section
+
+- Keep in mind: replication details. Anyone reading the paper should be able to reproduce the work.
+    - Add github url in footnotes
+- **Clean up repo**
+
+- "Explain everything that you have done"
+    - Why did you choose certain parameters?
+    - Why did you choose RLLib? Other libs tried?
 
 ## Meeting notes from 2023-01-23
 
 - Make sure to use same term everywhere
     - [x] CAV vs VANET vs Autonomous vehicles
 - [x] Move RL to 3; Reflow to only introduce RL after subgame
-- [ ] Add chapter to background for applications of game theory and RL in security problems with platoons and vehicles
-- [ ] Add chapter to background for surveys of vehicle threats and defenses before [2.3 risk estimation]
-- [ ] Add chapter in background after 2.4 for platooning - autonomous and not
+- [x] Add chapter to background for applications of game theory and RL in security problems with platoons and vehicles
+- [x] Add chapter to background for surveys of vehicle threats and defenses before [2.3 risk estimation]
+- [x] Add chapter in background after 2.4 for platooning - autonomous and not
 - [x] Break out methodology into two distinct chapters
 - [ ] Review platoon formalization to ensure matches latest
 
