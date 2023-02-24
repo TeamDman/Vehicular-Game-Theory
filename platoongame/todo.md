@@ -10,13 +10,20 @@
 
 ### Questions
 
-- [ ] Why did we use PPO and DQN instead of other algos?
+- [x] Why did we use PPO and DQN instead of other algos?
 - [ ] Why did we use Ray RLLib instead of other libraries or our own impl?
+
+## Overleaf 2023-02-19
+
+- [ ] Inline chapter 2 comments
+- [ ] Section 2.5 add more security stuff
+    - Roy, S., Ellis, C., Shiva, S., Dasgupta, D., Shandilya, V., & Wu, Q. (2010, January). A survey of game theory as applied to network security. In 2010 43rd Hawaii International Conference on System Sciences (pp. 1-10). IEEE.
+    
 
 ## Meeting notes 2023-02-13
 
-- [ ] Finish ch3 by weekend/sunday night
-- [ ] Finish ch4 by weekend/sunday night
+- [x] Finish ch3 by weekend/sunday night
+- [x] Finish ch4 by weekend/sunday night
 
 - Consider how to boost the security aspect of Ch 4 
 
