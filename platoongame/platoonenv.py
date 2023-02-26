@@ -953,7 +953,14 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         self.reset()
 
     def create_vehicles(self, num_vehicles: int):
-        values = np.around(np.clip(self.np_random.normal(-1,2, size=(num_vehicles,self.num_vulns_max)).astype(np.float32),-5,1))
+        severities = np.around(
+            np.clip(
+                self.np_random.normal(1,2, size=(num_vehicles,self.num_vulns_max)),
+                1,
+                5,
+            ),
+            0,
+        ).astype(np.float32)
         probs = self.np_random.uniform(0,1, size=(num_vehicles,self.num_vulns_max)).astype(np.float32)
 
         # get the indices of each row in a random order
@@ -967,17 +974,17 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         prune_idx[np.arange(num_vehicles)[:,None],keep] = False
 
         # commit prune
-        values[prune_idx] = 0
+        severities[prune_idx] = 0
         probs[prune_idx] = 0
 
-        return values, probs
+        return severities, probs
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         # every vehicle starts out of the platoon
         self.members = np.zeros((self.num_vehicles,), dtype=np.float32)
 
-        self.values, self.probs = self.create_vehicles(self.num_vehicles)
+        self.severities, self.probs = self.create_vehicles(self.num_vehicles)
 
         self.obs_probs = self.probs.copy()
         self.modes = np.zeros((self.num_vehicles,), dtype=np.float32)
@@ -987,8 +994,8 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
                 "action": -1,
                 "attacker_action": -1,
                 "reward": 0,
-                "state": self.members.copy(),
-                "values": self.values.copy(),
+                "members": self.members.copy(),
+                "severities": self.severities.copy(),
                 "probs": self.probs.copy(),
                 "obs_probs": self.obs_probs.copy(),
                 "modes": self.modes.copy(),
@@ -999,7 +1006,7 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         return self.get_observation(), self.render_infos[-1]
 
     def get_observation(self):
-        obs = np.hstack((self.modes, self.members, *self.values, *self.obs_probs))
+        obs = np.hstack((self.modes, self.members, *self.severities, *self.obs_probs))
         return obs
 
     def step(self, action: int):
@@ -1023,49 +1030,52 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
 
         # gather action outcome info before further environmental behaviours
         reward = 0
-        # lose 1 point for each non-member
-        reward -= np.sum(1-self.members) * (2.5**2)
-        # add values for vehicles which have prob 1 and are members
-        reward += np.sum(((self.values**2) * (self.probs == 1))[self.members == 1])
+        # gain points for size of the platoon
+        reward += np.sum(self.members)
+        # # lose points for risky posture
+        # reward -= (self.severities * self.probs)[self.members == 1].sum()
+        # # lose points for leveraged vulns
+        # reward -= np.sum(((self.severities) * (self.probs == 1))[self.members == 1])
         # scale reward
-        reward /= 100*self.num_vehicles # scale rewards between -1 and 1 to improve PPO training
-
-        done = False
-        trunc = self.steps_done >= self.steps_before_truncation
-        next_obs = self.get_observation()
+        reward /= self.num_vehicles # scale rewards between -1 and 1 to improve PPO training
 
         # environment behaviour - cycling
         if self.steps_done % self.cycle_interval == 0:
             # kick them out of the platoon, give them a new value, and reset their prob to simulate a new vehicle
             indices = self.np_random.choice(self.num_vehicles, self.cycle_num, replace=False)
             self.members[indices] = 0
-            self.values[indices], self.probs[indices] = self.create_vehicles(self.cycle_num)
+            self.severities[indices], self.probs[indices] = self.create_vehicles(self.cycle_num)
         else:
             indices = []
+
+
+
+        done = (self.severities * self.probs)[self.members == 1].sum(axis=1).max(initial=0) >= 5
+        trunc = self.steps_done >= self.steps_before_truncation-1
+        next_obs = self.get_observation()
+
 
         # track rendering info
         info = {
             "action": action,
             "attacker_action": attacker_action,
             "reward": reward,
-            "state": self.members.copy(),
-            "values": self.values.copy(),
+            "members": self.members.copy(),
+            "severities": self.severities.copy(),
             "probs": self.probs.copy(),
             "obs_probs": self.obs_probs.copy(),
             "modes": self.modes.copy(),
             "cycled": indices
         }
+        self.render_infos.append(info)
 
-        # environment behaviour - flip modes
         self.modes = 1-self.modes
 
-        self.render_infos.append(info)
         self.steps_done += 1
-
         return next_obs, reward, done, trunc, info
 
     def render(self):
-        vehicle_width=100
+        vehicle_width=75
         vehicle_height=4 + 16 * self.num_vulns_max
         padding=6
         width = self.num_vehicles * (vehicle_width + padding) + 400
@@ -1107,7 +1117,7 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
                 x = padding
                 for i in range(self.num_vehicles):
                     # draw cube
-                    if info["state"][i] == 1:
+                    if info["members"][i] == 1:
                         # if info["probs"][i] == 1:
                         #     canvas.fill_style = "#969"
                         # else:
@@ -1170,20 +1180,21 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
                         else:
                             canvas.fill_style = "black"
                         canvas.fill_text(
-                            text=f"{info['values'][i][j]:+} | {info['obs_probs'][i][j]:.2f}",
+                            text=f"{info['severities'][i][j]:.0f} | {info['obs_probs'][i][j]:.2f}",
                             x = x+padding,
                             y = y + 16 + 16*j,
                         )
                     x += vehicle_width + padding
                 # draw reward string     
-                canvas.font = "20px Consolas"
-                canvas.fill_style = "black"
-                reward_total += info['reward']
-                canvas.fill_text(
-                    text=f"action:{info['action']:02d}, reward:{info['reward']:+.03f} ({reward_total:+.03f})",
-                    x = x,
-                    y = y + vehicle_height - padding//2,
-                )
+                if info != self.render_infos[0]:
+                    canvas.font = "20px Consolas"
+                    canvas.fill_style = "black"
+                    reward_total += info['reward']
+                    canvas.fill_text(
+                        text=f"action:{info['action']:02d}, reward:{info['reward']:+.03f} ({reward_total:.03f})",
+                        x = x,
+                        y = y + vehicle_height - padding//2,
+                    )
                 y += vehicle_height + padding
 
             
