@@ -1054,6 +1054,8 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         trunc = self.steps_done >= self.steps_before_truncation-1
         next_obs = self.get_observation()
 
+        self.modes = 1-self.modes
+        self.steps_done += 1
 
         # track rendering info
         info = {
@@ -1069,9 +1071,6 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         }
         self.render_infos.append(info)
 
-        self.modes = 1-self.modes
-
-        self.steps_done += 1
         return next_obs, reward, done, trunc, info
 
     def render(self):
@@ -1079,7 +1078,7 @@ class InOutMultiValueProbCyclingMonitoringEnv(gym.Env):
         vehicle_height=4 + 16 * self.num_vulns_max
         padding=6
         width = self.num_vehicles * (vehicle_width + padding) + 400
-        height = (len(self.render_infos)+10) * (vehicle_height + padding)
+        height = (len(self.render_infos)) * (vehicle_height + padding) + 200
         canvas = Canvas(width=width, height=height)
         reward_total = 0
 
