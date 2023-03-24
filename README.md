@@ -22,3 +22,16 @@ Here's the full response from the slack for more info:
 > 2. Does your observation include information about which row it is deciding an action for. You are not using framestacking or an rnn policy in your config. A pure feedforward policy could not learn to keep track of that information on its own.
 > 3. You want to keep your rewards smaller preferably between 0 and 1. Also I have found that I get much better results it I return an instantaneous reward rather than cumulative on each step. So for example +/- for the square that was just turned on. Then at the end you can supply a terminal reward for the overall score. The reason is because targrt values will based on the return which will be a discounted sum of all the rewards in that episode. That adds a lot of extra counting of rewards and it makes it harder to distinguish good actions from bad ones (credit assignment).
 > 4. Rllib's implementation of value clipping will Clio if the values loss is greater than 10. I would bet, given your rewards, that almost all of your experience steps are bring clipped. When a step is clipped, it will not be learned on. You can set the vf_clip to float("inf") to disable and see if that makes a difference. Whatcha or for Nan's during training if you do that though. (edited) 
+
+## Lessons learned from this experience
+
+- Python dependency management is evil
+- Python dataclasses are lit
+- Ray RLLib is a great tool for reinforcement learning
+- Canvas is easier than pygame for RL environment rendering
+    - Plays nicer when in remote Jupyter notebooks
+- Reward shaping for RL is hard
+- PPO rewards should be between -1 and 1
+- Matplotlib makes it very easy to visualize data
+- Jupyter notebooks are great for prototyping, but it became necessary to move the environment into a separate file to keep things clean
+
