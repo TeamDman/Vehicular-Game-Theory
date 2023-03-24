@@ -2,7 +2,7 @@
 
 Code for my thesis involving autonomous vehicle security using game theory and reinforcement learning.
 
-![environment visualization](./platoonenv visualization.png)
+![environment visualization](visualization.png)
 
 ## Files of interest
 
