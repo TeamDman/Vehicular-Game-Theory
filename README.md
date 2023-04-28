@@ -1,5 +1,7 @@
 # Vehicular-Game-Theory
 
+[Link to paper](http://hdl.handle.net/1974/31506)
+
 Code for my thesis involving autonomous vehicle security using game theory and reinforcement learning.
 
 ![environment visualization](visualization.png)
